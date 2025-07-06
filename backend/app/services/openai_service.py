@@ -698,32 +698,68 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
         """Refine specific sections of the lesson content"""
 
         prompt = f"""
-        Refine the following {request.section_type} content based on the user's instructions:
+        You are an expert instructional designer. Refine the following {request.section_type} content based on the user's instructions.
 
-        Current content:
+        SECTION TYPE: {request.section_type}
+
+        CURRENT CONTENT:
         {request.section_content}
 
-        Refinement instructions:
+        REFINEMENT INSTRUCTIONS:
         {request.refinement_instructions}
 
-        Lesson context:
-        {json.dumps(request.lesson_context, indent=2)}
+        LESSON CONTEXT:
+        Course: {request.lesson_context.get('course_title', 'N/A')}
+        Topic: {request.lesson_context.get('lesson_topic', 'N/A')}
+        Level: {request.lesson_context.get('grade_level', 'N/A')}
+        Duration: {request.lesson_context.get('duration_minutes', 'N/A')} minutes
 
-        Return the refined content in the same format as the original, maintaining the same structure but improving based on the instructions.
+        INSTRUCTIONS:
+        1. Keep the same JSON structure and format as the original
+        2. Apply the requested refinements while maintaining educational quality
+        3. Ensure all required fields are present
+        4. For objectives: maintain proper Bloom's taxonomy alignment
+        5. For Gagne events: preserve the nine-event structure and time allocation
+        6. For lesson plans: keep all essential components
+
+        Return ONLY the refined JSON content with no additional text or formatting.
         """
 
-        response = await self.client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system",
-                 "content": "You are an expert instructional designer. Refine the content based on user feedback while maintaining the original structure."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7,
-            max_tokens=2000
-        )
+        try:
+            response = await self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system",
+                     "content": "You are an expert instructional designer. Return only valid JSON that matches the original structure exactly."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=3000
+            )
 
-        return {"refined_content": response.choices[0].message.content}
+            raw_content = response.choices[0].message.content.strip()
+
+            # Clean the response - remove markdown formatting
+            if raw_content.startswith('```json'):
+                clean_content = raw_content.replace('```json', '').replace('```', '').strip()
+            elif raw_content.startswith('```'):
+                clean_content = raw_content.replace('```', '').strip()
+            else:
+                clean_content = raw_content
+
+            # Try to parse as JSON to validate
+            try:
+                parsed_content = json.loads(clean_content)
+                return {"refined_content": clean_content}
+            except json.JSONDecodeError:
+                # If JSON parsing fails, return the content as-is but log the issue
+                print(f"Warning: Refined content is not valid JSON for {request.section_type}")
+                return {"refined_content": clean_content}
+
+        except Exception as e:
+            print(f"Error in content refinement: {e}")
+            # Return original content if refinement fails
+            return {"refined_content": request.section_content}
 
     def _create_fallback_lesson_plan(self, request: LessonRequest) -> LessonPlan:
         """Create fallback lesson plan if AI generation fails"""
