@@ -69,6 +69,9 @@ const Results = () => {
       return;
     }
 
+    // Show loading toast
+    const loadingToast = toast.loading('Refining content...');
+
     try {
       const refinementRequest = {
         section_type: editingSection,
@@ -77,19 +80,130 @@ const Results = () => {
         lesson_context: lessonData.lesson_info
       };
 
+      console.log('🔄 Starting refinement process');
+      console.log('📤 Refinement request:', refinementRequest);
+
       const result = await refineContent(refinementRequest);
+      console.log('📥 Raw API result:', result);
+
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
+
+      // Check if we got a valid response
+      if (!result || !result.refined_content) {
+        console.error('❌ No refined content in response');
+        throw new Error('No refined content received from API');
+      }
+
+      console.log('✅ Received refined content:', result.refined_content.substring(0, 200) + '...');
+
+      // Parse the refined content based on section type
+      let refinedData;
+      try {
+        refinedData = JSON.parse(result.refined_content);
+        console.log('✅ Successfully parsed JSON:', refinedData);
+      } catch (parseError) {
+        console.error('❌ JSON parse error:', parseError);
+        console.log('📄 Raw content that failed to parse:', result.refined_content);
+        throw new Error(`Failed to parse refined content as JSON: ${parseError.message}`);
+      }
 
       // Update lesson data with refined content
       const updatedData = { ...lessonData };
-      // Parse and update the specific section
-      // This would need more sophisticated parsing based on section type
+      let updateSuccessful = false;
 
+      switch (editingSection) {
+        case 'objectives':
+          if (Array.isArray(refinedData)) {
+            console.log('🎯 Processing objectives refinement');
+            updatedData.objectives = refinedData.map(obj => ({
+              bloom_level: obj.bloom_level || obj.level,
+              objective: obj.objective,
+              action_verb: obj.action_verb || obj.verb,
+              content: obj.content,
+              condition: obj.condition,
+              criteria: obj.criteria
+            }));
+            updateSuccessful = true;
+            console.log('✅ Updated objectives count:', updatedData.objectives.length);
+          } else {
+            console.error('❌ Refined data is not an array:', typeof refinedData);
+            throw new Error('Refined objectives data is not an array');
+          }
+          break;
+
+        case 'lesson_plan':
+          if (typeof refinedData === 'object' && refinedData !== null && !Array.isArray(refinedData)) {
+            console.log('📋 Processing lesson plan refinement');
+            updatedData.lesson_plan = {
+              ...updatedData.lesson_plan,
+              ...refinedData
+            };
+            updateSuccessful = true;
+            console.log('✅ Updated lesson plan');
+          } else {
+            console.error('❌ Refined data is not an object:', typeof refinedData);
+            throw new Error('Refined lesson plan data is not an object');
+          }
+          break;
+
+        case 'gagne_events':
+          if (Array.isArray(refinedData)) {
+            console.log('🎭 Processing Gagne events refinement');
+            updatedData.gagne_events = refinedData.map(event => ({
+              event_number: event.event_number,
+              event_name: event.event_name,
+              description: event.description,
+              activities: Array.isArray(event.activities) ? event.activities : [event.activities],
+              duration_minutes: event.duration_minutes,
+              materials_needed: Array.isArray(event.materials_needed) ? event.materials_needed : [event.materials_needed],
+              assessment_strategy: event.assessment_strategy
+            }));
+            updateSuccessful = true;
+            console.log('✅ Updated Gagne events count:', updatedData.gagne_events.length);
+          } else {
+            console.error('❌ Refined data is not an array:', typeof refinedData);
+            throw new Error('Refined Gagne events data is not an array');
+          }
+          break;
+
+        default:
+          console.error('❌ Unknown section type:', editingSection);
+          throw new Error(`Unknown section type: ${editingSection}`);
+      }
+
+      if (!updateSuccessful) {
+        throw new Error('Failed to update lesson data with refined content');
+      }
+
+      console.log('🔄 Updating React state and local storage');
+
+      // Update the lesson data state
       setLessonData(updatedData);
+
+      // Update local storage with refined content
+      saveDraft(updatedData);
+
+      // Close modal and clear form
       setEditingSection(null);
-      toast.success(TOAST_MESSAGES.SUCCESS.CONTENT_REFINED);
+      setRefinementInstructions('');
+      setEditContent('');
+
+      // Show success message
+      console.log('🎉 Refinement completed successfully!');
+      toast.success('Content refined successfully! ✅');
 
     } catch (error) {
-      toast.error(TOAST_MESSAGES.ERROR.REFINEMENT_FAILED);
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
+
+      console.error('💥 Refinement error occurred:');
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      console.error('Section:', editingSection);
+      console.error('Instructions:', refinementInstructions);
+
+      toast.error(`Refinement failed: ${error.message}`);
     }
   };
 

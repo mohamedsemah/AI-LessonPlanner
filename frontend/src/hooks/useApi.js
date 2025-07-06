@@ -30,8 +30,17 @@ export function useApi() {
   }, [executeRequest]);
 
   const refineContent = useCallback(async (refinementRequest) => {
-    return executeRequest(() => apiService.refineContent(refinementRequest));
-  }, [executeRequest]);
+    console.log('🔧 useApi: refineContent called');
+
+    try {
+      const result = await apiService.refineContent(refinementRequest);
+      console.log('🔧 useApi: API call successful');
+      return result;
+    } catch (err) {
+      console.error('🔧 useApi: API call failed:', err);
+      throw err; // Re-throw to let the caller handle it
+    }
+  }, []);
 
   const exportToPDF = useCallback(async (lessonData, options) => {
     return executeRequest(() => apiService.exportToPDF(lessonData, options));
