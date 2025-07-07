@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Download, Edit3, Eye, RefreshCw, ArrowLeft } from 'lucide-react';
+import { Download, Edit3, Eye, RefreshCw, ArrowLeft, BookOpen } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
@@ -15,7 +15,8 @@ import {
   formatDuration,
   groupObjectivesByBloom,
   generatePDFFilename,
-  downloadFile
+  downloadFile,
+  capitalize
 } from '../utils/helpers';
 import { TOAST_MESSAGES } from '../utils/constants';
 
@@ -23,7 +24,6 @@ const Results = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { exportToPDF, refineContent, loading } = useApi();
-  // FIX: Added saveDraft to the destructuring
   const { draft, clearDraft, saveDraft } = useLessonDraft();
 
   const [lessonData, setLessonData] = useState(location.state?.lessonData || draft);
@@ -215,6 +215,37 @@ const Results = () => {
     }
   };
 
+  // Helper function to clean and format grade level
+  const formatGradeLevel = (gradeLevel) => {
+    const gradeMap = {
+      'freshman': 'Freshman',
+      'sophomore': 'Sophomore',
+      'junior': 'Junior',
+      'senior': 'Senior',
+      'masters': 'Master\'s',
+      'postgrad': 'Postgraduate'
+    };
+
+    return gradeMap[gradeLevel] || capitalize(gradeLevel);
+  };
+
+  // Helper function to clean overview text
+  const cleanOverviewText = (overview) => {
+    if (!overview) return "This lesson provides comprehensive coverage of the topic with engaging activities and assessments.";
+
+    // Clean up any remaining template variables
+    let cleanText = overview
+      .replace(/GradeLevel\.MASTERS/g, 'master\'s')
+      .replace(/GradeLevel\.FRESHMAN/g, 'freshman')
+      .replace(/GradeLevel\.SOPHOMORE/g, 'sophomore')
+      .replace(/GradeLevel\.JUNIOR/g, 'junior')
+      .replace(/GradeLevel\.SENIOR/g, 'senior')
+      .replace(/GradeLevel\.POSTGRAD/g, 'postgraduate')
+      .replace(/GradeLevel\./g, '');
+
+    return cleanText;
+  };
+
   const objectivesByBloom = groupObjectivesByBloom(lessonData.objectives);
   const totalDuration = lessonData.total_duration;
 
@@ -265,7 +296,7 @@ const Results = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Lesson Overview */}
+            {/* Enhanced Lesson Overview */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -273,7 +304,10 @@ const Results = () => {
             >
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Lesson Overview</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <BookOpen className="w-5 h-5 text-primary-600" />
+                    Lesson Overview
+                  </CardTitle>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -283,17 +317,51 @@ const Results = () => {
                   </Button>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <span className="text-sm font-medium text-gray-500">Duration</span>
-                      <p className="text-lg font-semibold">{formatDuration(totalDuration)}</p>
+                  {/* Enhanced Stats Grid */}
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+                      <span className="text-sm font-medium text-blue-700">Duration</span>
+                      <p className="text-xl font-bold text-blue-900 mt-1">{formatDuration(totalDuration)}</p>
                     </div>
-                    <div>
-                      <span className="text-sm font-medium text-gray-500">Grade Level</span>
-                      <p className="text-lg font-semibold capitalize">{lessonData.lesson_info.grade_level}</p>
+                    <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+                      <span className="text-sm font-medium text-green-700">Grade Level</span>
+                      <p className="text-xl font-bold text-green-900 mt-1">{formatGradeLevel(lessonData.lesson_info.grade_level)}</p>
                     </div>
                   </div>
-                  <p className="text-gray-700">{lessonData.lesson_plan.overview}</p>
+
+                  {/* Course and Topic Info */}
+                  <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <span className="text-sm font-medium text-gray-500">Course</span>
+                        <p className="text-base font-semibold text-gray-900">{lessonData.lesson_info.course_title}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-gray-500">Topic</span>
+                        <p className="text-base font-semibold text-gray-900">{lessonData.lesson_info.lesson_topic}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Overview Description */}
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Overview</h4>
+                    <p className="text-gray-700 leading-relaxed">{cleanOverviewText(lessonData.lesson_plan.overview)}</p>
+                  </div>
+
+                  {/* Bloom's Levels Preview */}
+                  {Object.keys(objectivesByBloom).length > 0 && (
+                    <div className="mt-6">
+                      <h5 className="text-sm font-medium text-gray-700 mb-2">Cognitive Levels</h5>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.keys(objectivesByBloom).map(level => (
+                          <Badge key={level} variant={level} size="sm">
+                            {level.charAt(0).toUpperCase() + level.slice(1)}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>
@@ -516,6 +584,9 @@ const Results = () => {
                   value={refinementInstructions}
                   onChange={(e) => setRefinementInstructions(e.target.value)}
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Example: "Make the language more engaging", "Add more practical examples", "Focus on real-world applications"
+                </p>
               </div>
 
               <div>
@@ -528,6 +599,9 @@ const Results = () => {
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  You can also manually edit the JSON structure above if needed.
+                </p>
               </div>
             </div>
           </ModalBody>

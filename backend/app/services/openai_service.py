@@ -385,14 +385,32 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
     async def _generate_lesson_plan(self, request: LessonRequest) -> LessonPlan:
         """Generate a comprehensive lesson plan"""
 
+        # Format grade level properly for the prompt
+        grade_level_display = {
+            "freshman": "freshman",
+            "sophomore": "sophomore",
+            "junior": "junior",
+            "senior": "senior",
+            "masters": "master's",
+            "postgrad": "postgraduate"
+        }.get(request.grade_level, request.grade_level)
+
         prompt = f"""
-        Create a comprehensive lesson plan for a {request.grade_level} level course titled "{request.course_title}" 
+        Create a comprehensive lesson plan for {grade_level_display} students in a course titled "{request.course_title}" 
         for a lesson on "{request.lesson_topic}" lasting {request.duration_minutes} minutes.
 
         Preliminary objectives: {request.preliminary_objectives}
 
+        IMPORTANT FORMATTING GUIDELINES:
+        - Write the overview in complete, professional sentences
+        - Use "{grade_level_display}" when referring to the student level
+        - Make the overview engaging and descriptive (2-3 sentences)
+        - Focus on what students will learn and how they will learn it
+        - Include the learning approach and key activities
+        - DO NOT use template variables like "GradeLevel.MASTERS"
+
         Generate a detailed lesson plan including:
-        1. Clear lesson overview
+        1. Clear, engaging lesson overview that describes what students will learn and how
         2. Prerequisites students should have
         3. Materials and resources needed
         4. Technology requirements
@@ -404,8 +422,8 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
 
         Return as JSON with this structure:
         {{
-            "title": "Lesson title",
-            "overview": "Brief description of the lesson",
+            "title": "Engaging lesson title",
+            "overview": "This comprehensive lesson introduces {grade_level_display} students to [specific topic concepts], focusing on [key learning goals]. Students will explore [main concepts] through [teaching methods such as interactive discussions, hands-on activities, case studies]. The lesson combines theoretical understanding with practical application to ensure deep comprehension of [core topic elements].",
             "prerequisites": ["prerequisite 1", "prerequisite 2"],
             "materials": ["material 1", "material 2"],
             "technology_requirements": ["tech 1", "tech 2"],
@@ -418,7 +436,8 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
         response = await self.client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are an expert instructional designer. Return only valid JSON."},
+                {"role": "system",
+                 "content": "You are an expert instructional designer. Create engaging, professional lesson overviews. Never use template variables like 'GradeLevel.MASTERS' - always use proper, natural language formatting. Return only valid JSON."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
@@ -426,7 +445,29 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
         )
 
         try:
-            lesson_data = json.loads(response.choices[0].message.content)
+            raw_content = response.choices[0].message.content.strip()
+
+            # Clean the response
+            if raw_content.startswith('```json'):
+                raw_content = raw_content.replace('```json', '').replace('```', '').strip()
+            elif raw_content.startswith('```'):
+                raw_content = raw_content.replace('```', '').strip()
+
+            lesson_data = json.loads(raw_content)
+
+            # Post-process the overview to ensure proper formatting
+            if 'overview' in lesson_data:
+                overview = lesson_data['overview']
+                # Clean up any remaining template variables
+                overview = overview.replace('GradeLevel.MASTERS', 'master\'s')
+                overview = overview.replace('GradeLevel.FRESHMAN', 'freshman')
+                overview = overview.replace('GradeLevel.SOPHOMORE', 'sophomore')
+                overview = overview.replace('GradeLevel.JUNIOR', 'junior')
+                overview = overview.replace('GradeLevel.SENIOR', 'senior')
+                overview = overview.replace('GradeLevel.POSTGRAD', 'postgraduate')
+                overview = overview.replace('GradeLevel.', '')
+                lesson_data['overview'] = overview
+
             return LessonPlan(**lesson_data)
         except json.JSONDecodeError:
             return self._create_fallback_lesson_plan(request)
@@ -557,7 +598,6 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
 
         guidance += f"\nTotal must equal exactly {total_duration} minutes."
         return guidance
-        """Generate Gagne's Nine Events of Instruction"""
 
     async def _generate_gagne_events(self, request: LessonRequest, objectives: List[LessonObjective],
                                      lesson_plan: LessonPlan) -> List[GagneEvent]:
@@ -721,6 +761,7 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
         4. For objectives: maintain proper Bloom's taxonomy alignment
         5. For Gagne events: preserve the nine-event structure and time allocation
         6. For lesson plans: keep all essential components
+        7. DO NOT use template variables like "GradeLevel.MASTERS" - use natural language
 
         Return ONLY the refined JSON content with no additional text or formatting.
         """
@@ -730,7 +771,7 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
                 model="gpt-4o",
                 messages=[
                     {"role": "system",
-                     "content": "You are an expert instructional designer. Return only valid JSON that matches the original structure exactly."},
+                     "content": "You are an expert instructional designer. Return only valid JSON that matches the original structure exactly. Never use template variables like 'GradeLevel.MASTERS' - always use proper, natural language formatting."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
@@ -746,6 +787,15 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
                 clean_content = raw_content.replace('```', '').strip()
             else:
                 clean_content = raw_content
+
+            # Post-process to clean up any template variables
+            clean_content = clean_content.replace('GradeLevel.MASTERS', 'master\'s')
+            clean_content = clean_content.replace('GradeLevel.FRESHMAN', 'freshman')
+            clean_content = clean_content.replace('GradeLevel.SOPHOMORE', 'sophomore')
+            clean_content = clean_content.replace('GradeLevel.JUNIOR', 'junior')
+            clean_content = clean_content.replace('GradeLevel.SENIOR', 'senior')
+            clean_content = clean_content.replace('GradeLevel.POSTGRAD', 'postgraduate')
+            clean_content = clean_content.replace('GradeLevel.', '')
 
             # Try to parse as JSON to validate
             try:
@@ -763,9 +813,23 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
 
     def _create_fallback_lesson_plan(self, request: LessonRequest) -> LessonPlan:
         """Create fallback lesson plan if AI generation fails"""
+
+        # Format grade level properly
+        grade_level_display = {
+            "freshman": "freshman",
+            "sophomore": "sophomore",
+            "junior": "junior",
+            "senior": "senior",
+            "masters": "master's",
+            "postgrad": "postgraduate"
+        }.get(request.grade_level, request.grade_level)
+
+        # Create a more engaging overview
+        overview = f"This comprehensive lesson introduces {grade_level_display} students to {request.lesson_topic}, providing both theoretical understanding and practical application. Students will explore key concepts through interactive discussions, hands-on activities, and real-world examples to ensure deep comprehension and retention."
+
         return LessonPlan(
             title=f"{request.lesson_topic} - {request.course_title}",
-            overview=f"This lesson covers {request.lesson_topic} for {request.grade_level} students.",
+            overview=overview,
             prerequisites=[f"Basic understanding of {request.course_title} fundamentals"],
             materials=["Textbook", "Handouts", "Writing materials"],
             technology_requirements=["Computer/tablet", "Internet access"],
