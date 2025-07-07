@@ -51,7 +51,7 @@ class LessonRequest(BaseModel):
 
 
 class RefineRequest(BaseModel):
-    section_type: str = Field(..., pattern="^(objectives|lesson_plan|gagne_events)$")
+    section_type: str = Field(..., pattern="^(objectives|lesson_plan|gagne_events|duration_change)$")
     section_content: str = Field(..., min_length=1)
     refinement_instructions: str = Field(..., min_length=1, max_length=500)
     lesson_context: Dict[str, Any]
@@ -81,3 +81,11 @@ class PDFRequest(BaseModel):
     lesson_data: LessonResponse
     include_cover_page: bool = True
     include_appendices: bool = True
+
+
+class DurationChangeRequest(BaseModel):
+    """Model for duration change requests"""
+    current_duration: int = Field(..., gt=0, le=480)
+    new_duration: int = Field(..., gt=0, le=480)
+    gagne_events: List[GagneEvent]
+    lesson_plan: LessonPlan

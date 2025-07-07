@@ -12,6 +12,8 @@ export function cn(...inputs) {
  * Format duration from minutes to human-readable format
  */
 export function formatDuration(minutes) {
+  if (!minutes || minutes <= 0) return '0 min';
+
   if (minutes < 60) {
     return `${minutes} min`;
   }
@@ -224,6 +226,30 @@ export function validateLessonForm(data) {
 }
 
 /**
+ * Validate duration change
+ */
+export function validateDurationChange(currentDuration, newDuration) {
+  const errors = [];
+
+  const duration = parseInt(newDuration);
+
+  if (!duration) {
+    errors.push('Duration must be a valid number');
+  } else if (duration < 5) {
+    errors.push('Duration must be at least 5 minutes');
+  } else if (duration > 480) {
+    errors.push('Duration must be less than 8 hours (480 minutes)');
+  } else if (duration === currentDuration) {
+    errors.push('New duration must be different from current duration');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
+
+/**
  * Generate filename for PDF export
  */
 export function generatePDFFilename(lessonData) {
@@ -291,4 +317,290 @@ export function getStepStatus(currentStep, stepIndex) {
   if (stepIndex < currentStep) return 'completed';
   if (stepIndex === currentStep) return 'active';
   return 'inactive';
+}
+
+/**
+ * Format grade level for display
+ */
+export function formatGradeLevel(gradeLevel) {
+  const gradeMap = {
+    'freshman': 'Freshman',
+    'sophomore': 'Sophomore',
+    'junior': 'Junior',
+    'senior': 'Senior',
+    'masters': 'Master\'s',
+    'postgrad': 'Postgraduate'
+  };
+
+  return gradeMap[gradeLevel] || capitalize(gradeLevel);
+}
+
+/**
+ * Clean overview text from template variables
+ */
+export function cleanOverviewText(overview) {
+  if (!overview) return "This lesson provides comprehensive coverage of the topic with engaging activities and assessments.";
+
+  // Clean up any remaining template variables
+  let cleanText = overview
+    .replace(/GradeLevel\.MASTERS/g, 'master\'s')
+    .replace(/GradeLevel\.FRESHMAN/g, 'freshman')
+    .replace(/GradeLevel\.SOPHOMORE/g, 'sophomore')
+    .replace(/GradeLevel\.JUNIOR/g, 'junior')
+    .replace(/GradeLevel\.SENIOR/g, 'senior')
+    .replace(/GradeLevel\.POSTGRAD/g, 'postgraduate')
+    .replace(/GradeLevel\./g, '');
+
+  return cleanText;
+}
+
+/**
+ * Calculate time distribution for Gagne events
+ */
+export function calculateGagneTimeDistribution(totalDuration, focusType = 'balanced') {
+  const baseDistributions = {
+    theoretical: {
+      1: 0.05, 2: 0.05, 3: 0.12, 4: 0.35, 5: 0.15, 6: 0.15, 7: 0.08, 8: 0.05, 9: 0.06
+    },
+    practical: {
+      1: 0.05, 2: 0.03, 3: 0.08, 4: 0.25, 5: 0.20, 6: 0.25, 7: 0.10, 8: 0.04, 9: 0.06
+    },
+    balanced: {
+      1: 0.05, 2: 0.04, 3: 0.10, 4: 0.30, 5: 0.18, 6: 0.20, 7: 0.09, 8: 0.05, 9: 0.06
+    }
+  };
+
+  const distribution = baseDistributions[focusType] || baseDistributions.balanced;
+  const timeDistribution = {};
+  let totalAllocated = 0;
+
+  // Calculate time for events 1-8
+  for (let event = 1; event <= 8; event++) {
+    const minutes = Math.round(distribution[event] * totalDuration);
+    timeDistribution[event] = Math.max(1, minutes); // Minimum 1 minute
+    totalAllocated += timeDistribution[event];
+  }
+
+  // Event 9 gets remaining time
+  timeDistribution[9] = Math.max(1, totalDuration - totalAllocated);
+
+  return timeDistribution;
+}
+
+/**
+ * Validate time distribution
+ */
+export function validateTimeDistribution(timeDistribution, expectedTotal) {
+  const actualTotal = Object.values(timeDistribution).reduce((sum, time) => sum + time, 0);
+  const tolerance = 2; // Allow 2 minute tolerance
+
+  return Math.abs(actualTotal - expectedTotal) <= tolerance;
+}
+
+/**
+ * Get lesson focus type based on Bloom's levels
+ */
+export function getLessonFocusType(bloomLevels) {
+  if (!bloomLevels || bloomLevels.length === 0) return 'balanced';
+
+  const practicalLevels = ['apply', 'analyze', 'evaluate', 'create'];
+  const theoreticalLevels = ['remember', 'understand'];
+
+  const practicalCount = bloomLevels.filter(level => practicalLevels.includes(level)).length;
+  const theoreticalCount = bloomLevels.filter(level => theoreticalLevels.includes(level)).length;
+
+  if (practicalCount > theoreticalCount) return 'practical';
+  if (theoreticalCount > practicalCount) return 'theoretical';
+  return 'balanced';
+}
+
+/**
+ * Format time distribution for display
+ */
+export function formatTimeDistribution(timeDistribution, totalDuration) {
+  const eventNames = {
+    1: "Gain Attention",
+    2: "Inform Objectives",
+    3: "Stimulate Recall",
+    4: "Present Content",
+    5: "Provide Guidance",
+    6: "Elicit Performance",
+    7: "Provide Feedback",
+    8: "Assess Performance",
+    9: "Enhance Retention"
+  };
+
+  return Object.entries(timeDistribution).map(([eventNum, minutes]) => {
+    const percentage = ((minutes / totalDuration) * 100).toFixed(1);
+    return {
+      event: parseInt(eventNum),
+      name: eventNames[eventNum],
+      minutes: minutes,
+      percentage: percentage
+    };
+  });
+}
+
+/**
+ * Deep clone object
+ */
+export function deepClone(obj) {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (obj instanceof Date) return new Date(obj.getTime());
+  if (obj instanceof Array) return obj.map(item => deepClone(item));
+  if (typeof obj === 'object') {
+    const clonedObj = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        clonedObj[key] = deepClone(obj[key]);
+      }
+    }
+    return clonedObj;
+  }
+}
+
+/**
+ * Compare two lesson data objects for changes
+ */
+export function compareLessonData(oldData, newData) {
+  const changes = [];
+
+  // Check duration change
+  if (oldData.total_duration !== newData.total_duration) {
+    changes.push({
+      type: 'duration',
+      old: oldData.total_duration,
+      new: newData.total_duration
+    });
+  }
+
+  // Check objectives count change
+  if (oldData.objectives.length !== newData.objectives.length) {
+    changes.push({
+      type: 'objectives_count',
+      old: oldData.objectives.length,
+      new: newData.objectives.length
+    });
+  }
+
+  // Check overview change
+  if (oldData.lesson_plan.overview !== newData.lesson_plan.overview) {
+    changes.push({
+      type: 'overview',
+      old: oldData.lesson_plan.overview.substring(0, 50) + '...',
+      new: newData.lesson_plan.overview.substring(0, 50) + '...'
+    });
+  }
+
+  return changes;
+}
+
+/**
+ * Export lesson data for external use
+ */
+export function exportLessonData(lessonData, format = 'json') {
+  const exportData = {
+    meta: {
+      exported_at: new Date().toISOString(),
+      format: format,
+      version: '1.0.0'
+    },
+    lesson: lessonData
+  };
+
+  switch (format) {
+    case 'json':
+      return JSON.stringify(exportData, null, 2);
+    case 'csv':
+      return convertLessonToCSV(lessonData);
+    default:
+      return exportData;
+  }
+}
+
+/**
+ * Convert lesson data to CSV format
+ */
+function convertLessonToCSV(lessonData) {
+  const rows = [];
+
+  // Header
+  rows.push(['Section', 'Type', 'Content', 'Duration', 'Notes']);
+
+  // Basic info
+  rows.push(['Info', 'Course', lessonData.lesson_info.course_title, '', '']);
+  rows.push(['Info', 'Topic', lessonData.lesson_info.lesson_topic, lessonData.total_duration, '']);
+  rows.push(['Info', 'Grade Level', lessonData.lesson_info.grade_level, '', '']);
+
+  // Objectives
+  lessonData.objectives.forEach((obj, index) => {
+    rows.push([
+      'Objectives',
+      obj.bloom_level,
+      obj.objective,
+      '',
+      `${obj.action_verb} - ${obj.content}`
+    ]);
+  });
+
+  // Gagne Events
+  lessonData.gagne_events.forEach(event => {
+    rows.push([
+      'Gagne Events',
+      `Event ${event.event_number}`,
+      event.event_name,
+      event.duration_minutes,
+      event.description
+    ]);
+  });
+
+  return rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+}
+
+/**
+ * Check if browser supports localStorage
+ */
+export function isLocalStorageAvailable() {
+  try {
+    const test = '__localStorage_test__';
+    localStorage.setItem(test, test);
+    localStorage.removeItem(test);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Safe localStorage operations
+ */
+export function safeLocalStorage() {
+  return {
+    getItem: (key) => {
+      try {
+        return localStorage.getItem(key);
+      } catch (e) {
+        console.warn('localStorage getItem failed:', e);
+        return null;
+      }
+    },
+    setItem: (key, value) => {
+      try {
+        localStorage.setItem(key, value);
+        return true;
+      } catch (e) {
+        console.warn('localStorage setItem failed:', e);
+        return false;
+      }
+    },
+    removeItem: (key) => {
+      try {
+        localStorage.removeItem(key);
+        return true;
+      } catch (e) {
+        console.warn('localStorage removeItem failed:', e);
+        return false;
+      }
+    }
+  };
 }

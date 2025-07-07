@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Download, Edit3, Eye, RefreshCw, ArrowLeft, BookOpen } from 'lucide-react';
+import { Download, Edit3, Eye, RefreshCw, ArrowLeft, BookOpen, Clock, Target } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
@@ -31,6 +31,10 @@ const Results = () => {
   const [editingSection, setEditingSection] = useState(null);
   const [editContent, setEditContent] = useState('');
   const [refinementInstructions, setRefinementInstructions] = useState('');
+
+  // Duration change states
+  const [showDurationModal, setShowDurationModal] = useState(false);
+  const [newDuration, setNewDuration] = useState('');
 
   useEffect(() => {
     if (!lessonData) {
@@ -62,6 +66,115 @@ const Results = () => {
     setEditingSection(sectionType);
     setEditContent(JSON.stringify(content, null, 2));
     setRefinementInstructions('');
+  };
+
+  const calculateOptimalObjectives = (duration) => {
+    // Replicate the backend logic for calculating optimal objectives
+    if (duration <= 30) return 2;
+    if (duration <= 60) return 3;
+    if (duration <= 90) return 4;
+    if (duration <= 120) return 5;
+    return 6;
+  };
+
+  const handleDurationChange = async () => {
+    const durationMinutes = parseInt(newDuration);
+
+    if (!durationMinutes || durationMinutes < 5 || durationMinutes > 480) {
+      toast.error('Duration must be between 5 and 480 minutes');
+      return;
+    }
+
+    const loadingToast = toast.loading('Adjusting lesson duration and recalculating objectives...');
+
+    try {
+      // Calculate if objectives need to be recalculated
+      const currentObjectivesCount = lessonData.objectives.length;
+      const optimalObjectivesCount = calculateOptimalObjectives(durationMinutes);
+      const objectiveChangeNeeded = Math.abs(optimalObjectivesCount - currentObjectivesCount) >= 1;
+
+      // Create a comprehensive refinement request that handles duration, objectives, and events
+      const refinementRequest = {
+        section_type: 'duration_change',
+        section_content: JSON.stringify({
+          current_duration: lessonData.lesson_info.duration_minutes,
+          new_duration: durationMinutes,
+          gagne_events: lessonData.gagne_events,
+          lesson_plan: lessonData.lesson_plan,
+          current_objectives: lessonData.objectives
+        }),
+        refinement_instructions: `Change the lesson duration from ${lessonData.lesson_info.duration_minutes} minutes to ${durationMinutes} minutes. Recalculate the time distribution for all Gagne events. Update the lesson overview. ${objectiveChangeNeeded ? `Recalculate learning objectives from ${currentObjectivesCount} to ${optimalObjectivesCount} objectives for optimal cognitive load.` : 'Keep existing objectives but ensure they are achievable in the new timeframe.'}`,
+        lesson_context: {
+          ...lessonData.lesson_info,
+          selected_bloom_levels: lessonData.lesson_info.selected_bloom_levels
+        }
+      };
+
+      console.log('🔄 Starting duration change with objective recalculation');
+      console.log('📊 Current objectives:', currentObjectivesCount, '→ Optimal:', optimalObjectivesCount);
+
+      const result = await refineContent(refinementRequest);
+
+      if (!result || !result.refined_content) {
+        throw new Error('No refined content received from API');
+      }
+
+      const refinedData = JSON.parse(result.refined_content);
+      console.log('📥 Refined data received:', refinedData);
+
+      // Update the entire lesson data with new duration, objectives, and events
+      const updatedData = {
+        ...lessonData,
+        lesson_info: {
+          ...lessonData.lesson_info,
+          duration_minutes: durationMinutes
+        },
+        total_duration: durationMinutes,
+        gagne_events: refinedData.gagne_events || lessonData.gagne_events,
+        lesson_plan: {
+          ...lessonData.lesson_plan,
+          overview: refinedData.overview || lessonData.lesson_plan.overview
+        }
+      };
+
+      // Update objectives if they were recalculated
+      if (refinedData.objectives && Array.isArray(refinedData.objectives)) {
+        console.log('🎯 Updating objectives:', refinedData.objectives.length, 'new objectives');
+        updatedData.objectives = refinedData.objectives.map(obj => ({
+          bloom_level: obj.bloom_level,
+          objective: obj.objective,
+          action_verb: obj.action_verb || obj.verb,
+          content: obj.content,
+          condition: obj.condition,
+          criteria: obj.criteria
+        }));
+      }
+
+      setLessonData(updatedData);
+      saveDraft(updatedData);
+      setShowDurationModal(false);
+      setNewDuration('');
+
+      toast.dismiss(loadingToast);
+
+      // Show comprehensive success message
+      const changesSummary = refinedData.duration_change_summary;
+      if (changesSummary && changesSummary.objectives_changed) {
+        toast.success(
+          `✅ Lesson updated to ${formatDuration(durationMinutes)}!\n` +
+          `📊 Objectives: ${changesSummary.old_objectives_count} → ${changesSummary.new_objectives_count}\n` +
+          `⏱️ All Gagne events recalculated`,
+          { duration: 6000 }
+        );
+      } else {
+        toast.success(`Lesson duration updated to ${formatDuration(durationMinutes)}!`);
+      }
+
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      console.error('Duration change error:', error);
+      toast.error(`Failed to update duration: ${error.message}`);
+    }
   };
 
   const handleRefineContent = async () => {
@@ -248,6 +361,8 @@ const Results = () => {
 
   const objectivesByBloom = groupObjectivesByBloom(lessonData.objectives);
   const totalDuration = lessonData.total_duration;
+  const optimalObjectivesForDuration = calculateOptimalObjectives(totalDuration);
+  const currentObjectivesCount = lessonData.objectives.length;
 
   return (
     <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
@@ -318,14 +433,57 @@ const Results = () => {
                 </CardHeader>
                 <CardContent>
                   {/* Enhanced Stats Grid */}
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                    {/* Duration Card with Edit Functionality */}
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200 relative group">
                       <span className="text-sm font-medium text-blue-700">Duration</span>
-                      <p className="text-xl font-bold text-blue-900 mt-1">{formatDuration(totalDuration)}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xl font-bold text-blue-900 mt-1">{formatDuration(totalDuration)}</p>
+                        <button
+                          onClick={() => {
+                            setNewDuration(totalDuration.toString());
+                            setShowDurationModal(true);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-blue-200 rounded"
+                          title="Change duration"
+                        >
+                          <Clock className="w-4 h-4 text-blue-600" />
+                        </button>
+                      </div>
                     </div>
+
                     <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
                       <span className="text-sm font-medium text-green-700">Grade Level</span>
                       <p className="text-xl font-bold text-green-900 mt-1">{formatGradeLevel(lessonData.lesson_info.grade_level)}</p>
+                    </div>
+
+                    {/* Objectives Count with Smart Indicator */}
+                    <div className={`bg-gradient-to-br p-4 rounded-lg border relative ${
+                      Math.abs(currentObjectivesCount - optimalObjectivesForDuration) <= 1 
+                        ? 'from-green-50 to-green-100 border-green-200' 
+                        : 'from-yellow-50 to-yellow-100 border-yellow-200'
+                    }`}>
+                      <span className={`text-sm font-medium ${
+                        Math.abs(currentObjectivesCount - optimalObjectivesForDuration) <= 1 
+                          ? 'text-green-700' 
+                          : 'text-yellow-700'
+                      }`}>
+                        Objectives
+                      </span>
+                      <div className="flex items-center justify-between">
+                        <p className={`text-xl font-bold mt-1 ${
+                          Math.abs(currentObjectivesCount - optimalObjectivesForDuration) <= 1 
+                            ? 'text-green-900' 
+                            : 'text-yellow-900'
+                        }`}>
+                          {currentObjectivesCount}
+                        </p>
+                        {Math.abs(currentObjectivesCount - optimalObjectivesForDuration) > 1 && (
+                          <div className="text-xs text-yellow-600" title={`Optimal: ${optimalObjectivesForDuration} for ${formatDuration(totalDuration)}`}>
+                            <Target className="w-4 h-4" />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -360,6 +518,25 @@ const Results = () => {
                           </Badge>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Objective Optimization Notice */}
+                  {Math.abs(currentObjectivesCount - optimalObjectivesForDuration) > 1 && (
+                    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        <Target className="w-4 h-4 inline mr-1" />
+                        <strong>Optimization Tip:</strong> For a {formatDuration(totalDuration)} lesson, {optimalObjectivesForDuration} objectives would be optimal for cognitive load management.
+                        <button
+                          onClick={() => {
+                            setNewDuration(totalDuration.toString());
+                            setShowDurationModal(true);
+                          }}
+                          className="ml-2 text-yellow-600 hover:text-yellow-800 underline"
+                        >
+                          Optimize now
+                        </button>
+                      </p>
                     </div>
                   )}
                 </CardContent>
@@ -506,6 +683,16 @@ const Results = () => {
                       <span className="text-gray-600">Events</span>
                       <span className="font-semibold">{lessonData.gagne_events.length}</span>
                     </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Optimal Objectives</span>
+                      <span className={`font-semibold ${
+                        Math.abs(currentObjectivesCount - optimalObjectivesForDuration) <= 1 
+                          ? 'text-green-600' 
+                          : 'text-yellow-600'
+                      }`}>
+                        {optimalObjectivesForDuration}
+                      </span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -563,6 +750,87 @@ const Results = () => {
             </motion.div>
           </div>
         </div>
+
+        {/* Enhanced Duration Change Modal */}
+        <Modal
+          isOpen={showDurationModal}
+          onClose={() => setShowDurationModal(false)}
+          title="Change Lesson Duration"
+          size="md"
+        >
+          <ModalBody>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  New Duration (minutes)
+                </label>
+                <input
+                  type="number"
+                  min="5"
+                  max="480"
+                  value={newDuration}
+                  onChange={(e) => setNewDuration(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  placeholder="Enter duration in minutes (5-480)"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Current: {formatDuration(totalDuration)} | Optimal objectives: {calculateOptimalObjectives(parseInt(newDuration) || totalDuration)}
+                </p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <h4 className="text-sm font-medium text-blue-800 mb-1">What will happen:</h4>
+                <ul className="text-xs text-blue-700 space-y-1">
+                  <li>• All Gagne events will be recalculated for the new duration</li>
+                  <li>• Lesson overview will be updated to reflect the change</li>
+                  <li>• Learning objectives will be optimized for cognitive load</li>
+                  <li>• Time distribution will follow pedagogical best practices</li>
+                </ul>
+              </div>
+
+              {/* Objective Impact Preview */}
+              {newDuration && parseInt(newDuration) !== totalDuration && (
+                <div className={`border rounded-lg p-3 ${
+                  Math.abs(calculateOptimalObjectives(parseInt(newDuration)) - currentObjectivesCount) >= 1
+                    ? 'bg-yellow-50 border-yellow-200'
+                    : 'bg-green-50 border-green-200'
+                }`}>
+                  <h4 className={`text-sm font-medium mb-1 ${
+                    Math.abs(calculateOptimalObjectives(parseInt(newDuration)) - currentObjectivesCount) >= 1
+                      ? 'text-yellow-800'
+                      : 'text-green-800'
+                  }`}>
+                    Objective Impact:
+                  </h4>
+                  <p className={`text-xs ${
+                    Math.abs(calculateOptimalObjectives(parseInt(newDuration)) - currentObjectivesCount) >= 1
+                      ? 'text-yellow-700'
+                      : 'text-green-700'
+                  }`}>
+                    {currentObjectivesCount} current objectives → {calculateOptimalObjectives(parseInt(newDuration))} optimal objectives
+                    {Math.abs(calculateOptimalObjectives(parseInt(newDuration)) - currentObjectivesCount) >= 1
+                      ? ' (will be recalculated)'
+                      : ' (no change needed)'
+                    }
+                  </p>
+                </div>
+              )}
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" onClick={() => setShowDurationModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDurationChange}
+              loading={loading}
+              className="flex items-center gap-2"
+            >
+              <Clock className="w-4 h-4" />
+              Update Duration & Objectives
+            </Button>
+          </ModalFooter>
+        </Modal>
 
         {/* Edit Modal */}
         <Modal
