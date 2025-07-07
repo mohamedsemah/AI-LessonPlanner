@@ -868,6 +868,23 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
             # Format the selected bloom levels for the prompt
             bloom_levels_text = ', '.join(selected_bloom_levels)
 
+            # Build the objectives section separately to avoid f-string nesting issues
+            objectives_requirement = ""
+            bloom_distribution_requirement = ""
+
+            if objective_change_needed:
+                objectives_requirement = f"7. Recalculate learning objectives for optimal cognitive load with {new_objectives_count} total objectives"
+                bloom_distribution_requirement = f"8. Distribute objectives across Bloom's levels: {bloom_levels_text}"
+            else:
+                objectives_requirement = "7. Keep existing objectives but ensure they're achievable in the new timeframe"
+
+            # Build the return JSON structure separately to avoid f-string issues
+            objectives_json_part = ""
+            if objective_change_needed:
+                objectives_json_part = f'"objectives": [{new_objectives_count} recalculated objectives with proper Bloom\'s distribution]'
+            else:
+                objectives_json_part = '"objectives_note": "Existing objectives maintained - no recalculation needed"'
+
             prompt = f"""
             Adjust this lesson from {current_duration} minutes to {new_duration} minutes.
 
@@ -885,7 +902,7 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
             {self._format_time_distribution_guidance(new_time_distribution, new_duration)}
 
             OBJECTIVE ADJUSTMENT NEEDED: {"Yes" if objective_change_needed else "No"}
-            {f"- Recommended count change: {current_objectives_count} → {new_objectives_count} objectives" if objective_change_needed else "- Keep current number of objectives"}
+            - Recommended count change: {current_objectives_count} → {new_objectives_count} objectives
 
             REQUIREMENTS:
             1. Keep all 9 Gagne events with the same names and purposes
@@ -894,18 +911,14 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
             4. Maintain pedagogical quality while scaling content
             5. Update the lesson overview to mention the new {new_duration}-minute duration
             6. Use "{grade_level_display}" when referring to student level, not template variables
-            {f"7. Recalculate learning objectives for optimal cognitive load with {new_objectives_count} total objectives" if objective_change_needed else "7. Keep existing objectives but ensure they're achievable in the new timeframe"}
-            {f"8. Distribute objectives across Bloom's levels: {bloom_levels_text}" if objective_change_needed else ""}
+            {objectives_requirement}
+            {bloom_distribution_requirement}
 
-            Return JSON with:
+            Return JSON with this exact structure:
             {{
                 "gagne_events": [array of 9 updated events with new durations],
                 "overview": "Updated overview text mentioning {new_duration} minutes and {grade_level_display} students",
-                **({
-                    "objectives": [f"{new_objectives_count} recalculated objectives with proper Bloom's distribution"]
-                } if objective_change_needed else {
-                    "objectives_note": "Existing objectives maintained - no recalculation needed"
-                })
+                {objectives_json_part},
                 "duration_change_summary": {{
                     "old_duration": {current_duration},
                     "new_duration": {new_duration},
