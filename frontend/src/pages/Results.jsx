@@ -39,6 +39,11 @@ const Results = () => {
   useEffect(() => {
     if (!lessonData) {
       navigate('/create');
+    } else {
+      // Debug logging to see the data structure
+      console.log('📊 Lesson Data Structure:', lessonData);
+      console.log('🎯 Objectives Data:', lessonData.objectives);
+      console.log('📝 First Objective Sample:', lessonData.objectives?.[0]);
     }
   }, [lessonData, navigate]);
 
@@ -77,7 +82,7 @@ const Results = () => {
     return 6;
   };
 
-  const handleDurationChange = async () => {
+const handleDurationChange = async () => {
     const durationMinutes = parseInt(newDuration);
 
     if (!durationMinutes || durationMinutes < 5 || durationMinutes > 480) {
@@ -113,6 +118,98 @@ const Results = () => {
       console.log('🔄 Starting duration change with objective recalculation');
       console.log('📊 Current objectives:', currentObjectivesCount, '→ Optimal:', optimalObjectivesCount);
 
+      const result = await refineContent(refinementRequest);
+
+      if (!result || !result.refined_content) {
+        throw new Error('No refined content received from API');
+      }
+
+      const refinedData = JSON.parse(result.refined_content);
+      console.log('📥 Refined data received:', refinedData);
+
+      // Update the entire lesson data with new duration, objectives, and events
+      const updatedData = {
+        ...lessonData,
+        lesson_info: {
+          ...lessonData.lesson_info,
+          duration_minutes: durationMinutes
+        },
+        total_duration: durationMinutes,
+        gagne_events: refinedData.gagne_events || lessonData.gagne_events,
+        lesson_plan: {
+          ...lessonData.lesson_plan,
+          overview: refinedData.overview || lessonData.lesson_plan.overview
+        }
+      };
+
+      // FIXED: Update objectives with proper structure validation
+      if (refinedData.objectives && Array.isArray(refinedData.objectives)) {
+        console.log('🎯 Updating objectives:', refinedData.objectives.length, 'new objectives');
+        console.log('🔍 Raw objectives from API:', refinedData.objectives);
+
+        // Enhanced objective processing with validation
+        updatedData.objectives = refinedData.objectives.map((obj, index) => {
+          console.log(`🎯 Processing objective ${index + 1}:`, obj);
+
+          // Handle different possible structures from the backend
+          const processedObjective = {
+            bloom_level: obj.bloom_level || obj.level || 'understand',
+            objective: obj.objective || obj.description || `Learning objective ${index + 1}`,
+            action_verb: obj.action_verb || obj.verb || obj.action || 'understand',
+            content: obj.content || obj.topic || 'core concepts',
+            condition: obj.condition || null,
+            criteria: obj.criteria || null
+          };
+
+          console.log(`✅ Processed objective ${index + 1}:`, processedObjective);
+          return processedObjective;
+        });
+
+        console.log('✅ Final objectives structure:', updatedData.objectives);
+      } else {
+        console.log('⚠️ No objectives in refined data, keeping existing objectives');
+        // Keep existing objectives but ensure they have proper structure
+        updatedData.objectives = lessonData.objectives.map(obj => ({
+          bloom_level: obj.bloom_level || 'understand',
+          objective: obj.objective || 'Learning objective',
+          action_verb: obj.action_verb || 'understand',
+          content: obj.content || 'core concepts',
+          condition: obj.condition || null,
+          criteria: obj.criteria || null
+        }));
+      }
+
+      // Validate the final objectives structure
+      console.log('🔍 Final lesson data objectives:', updatedData.objectives);
+      console.log('🔍 Objectives count:', updatedData.objectives.length);
+      console.log('🔍 First objective sample:', updatedData.objectives[0]);
+
+      setLessonData(updatedData);
+      saveDraft(updatedData);
+      setShowDurationModal(false);
+      setNewDuration('');
+
+      toast.dismiss(loadingToast);
+
+      // Show comprehensive success message
+      const changesSummary = refinedData.duration_change_summary;
+      if (changesSummary && changesSummary.objectives_changed) {
+        toast.success(
+          `✅ Lesson updated to ${formatDuration(durationMinutes)}!\n` +
+          `📊 Objectives: ${changesSummary.old_objectives_count} → ${changesSummary.new_objectives_count}\n` +
+          `⏱️ All Gagne events recalculated`,
+          { duration: 6000 }
+        );
+      } else {
+        toast.success(`Lesson duration updated to ${formatDuration(durationMinutes)}!`);
+      }
+
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      console.error('Duration change error:', error);
+      toast.error(`Failed to update duration: ${error.message}`);
+    }
+  };
       const result = await refineContent(refinementRequest);
 
       if (!result || !result.refined_content) {
@@ -359,10 +456,18 @@ const Results = () => {
     return cleanText;
   };
 
-  const objectivesByBloom = groupObjectivesByBloom(lessonData.objectives);
-  const totalDuration = lessonData.total_duration;
+  // FIXED: Ensure objectives exist and are properly structured
+  const safeObjectives = lessonData.objectives || [];
+  const objectivesByBloom = groupObjectivesByBloom(safeObjectives);
+  const totalDuration = lessonData.total_duration || lessonData.lesson_info?.duration_minutes || 0;
   const optimalObjectivesForDuration = calculateOptimalObjectives(totalDuration);
-  const currentObjectivesCount = lessonData.objectives.length;
+  const currentObjectivesCount = safeObjectives.length;
+
+  // FIXED: Get unique Bloom's levels from objectives
+  const bloomLevelsUsed = [...new Set(safeObjectives.map(obj => obj.bloom_level))].filter(Boolean);
+  const bloomLevelsDisplay = bloomLevelsUsed.length > 0
+    ? bloomLevelsUsed.map(level => capitalize(level)).join(', ')
+    : 'Not defined';
 
   return (
     <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
@@ -507,19 +612,21 @@ const Results = () => {
                     <p className="text-gray-700 leading-relaxed">{cleanOverviewText(lessonData.lesson_plan.overview)}</p>
                   </div>
 
-                  {/* Bloom's Levels Preview */}
-                  {Object.keys(objectivesByBloom).length > 0 && (
-                    <div className="mt-6">
-                      <h5 className="text-sm font-medium text-gray-700 mb-2">Cognitive Levels</h5>
-                      <div className="flex flex-wrap gap-2">
-                        {Object.keys(objectivesByBloom).map(level => (
+                  {/* FIXED: Bloom's Levels Preview */}
+                  <div className="mt-6">
+                    <h5 className="text-sm font-medium text-gray-700 mb-2">Cognitive Levels</h5>
+                    <div className="flex flex-wrap gap-2">
+                      {bloomLevelsUsed.length > 0 ? (
+                        bloomLevelsUsed.map(level => (
                           <Badge key={level} variant={level} size="sm">
-                            {level.charAt(0).toUpperCase() + level.slice(1)}
+                            {capitalize(level)}
                           </Badge>
-                        ))}
-                      </div>
+                        ))
+                      ) : (
+                        <span className="text-sm text-gray-500">No levels defined</span>
+                      )}
                     </div>
-                  )}
+                  </div>
 
                   {/* Objective Optimization Notice */}
                   {Math.abs(currentObjectivesCount - optimalObjectivesForDuration) > 1 && (
@@ -543,7 +650,7 @@ const Results = () => {
               </Card>
             </motion.div>
 
-            {/* Learning Objectives */}
+            {/* FIXED: Learning Objectives */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -555,36 +662,46 @@ const Results = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleEditSection('objectives', lessonData.objectives)}
+                    onClick={() => handleEditSection('objectives', safeObjectives)}
                   >
                     <Edit3 className="w-4 h-4" />
                   </Button>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-6">
-                    {Object.entries(objectivesByBloom).map(([level, objectives]) => (
-                      <div key={level}>
-                        <div className="flex items-center gap-2 mb-3">
-                          <Badge variant={level} size="sm">
-                            {level.charAt(0).toUpperCase() + level.slice(1)}
-                          </Badge>
-                          <span className="text-sm text-gray-500">
-                            {objectives.length} objective{objectives.length !== 1 ? 's' : ''}
-                          </span>
+                  {safeObjectives.length > 0 ? (
+                    <div className="space-y-6">
+                      {Object.entries(objectivesByBloom).map(([level, objectives]) => (
+                        <div key={level}>
+                          <div className="flex items-center gap-2 mb-3">
+                            <Badge variant={level} size="sm">
+                              {capitalize(level)}
+                            </Badge>
+                            <span className="text-sm text-gray-500">
+                              {objectives.length} objective{objectives.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          <ul className="space-y-2 ml-4">
+                            {objectives.map((objective, index) => (
+                              <li key={index} className="text-gray-700 text-sm">
+                                • {objective.objective}
+                                {objective.condition && (
+                                  <span className="text-gray-500"> ({objective.condition})</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
                         </div>
-                        <ul className="space-y-2 ml-4">
-                          {objectives.map((objective, index) => (
-                            <li key={index} className="text-gray-700 text-sm">
-                              • {objective.objective}
-                              {objective.condition && (
-                                <span className="text-gray-500"> ({objective.condition})</span>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Target className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500">No learning objectives found</p>
+                      <p className="text-sm text-gray-400 mt-1">
+                        Try regenerating the lesson or editing the content
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>
@@ -608,45 +725,55 @@ const Results = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-6">
-                    {lessonData.gagne_events.map((event, index) => (
-                      <div key={index} className="border-l-4 border-primary-200 pl-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-semibold text-gray-900">
-                            Event {event.event_number}: {event.event_name}
-                          </h4>
-                          <Badge variant="default" size="sm">
-                            {formatDuration(event.duration_minutes)}
-                          </Badge>
-                        </div>
-                        <p className="text-gray-600 text-sm mb-3">{event.description}</p>
-
-                        {event.activities && event.activities.length > 0 && (
-                          <div className="mb-3">
-                            <span className="text-sm font-medium text-gray-700">Activities:</span>
-                            <ul className="ml-4 mt-1 space-y-1">
-                              {event.activities.map((activity, actIndex) => (
-                                <li key={actIndex} className="text-sm text-gray-600">
-                                  • {activity}
-                                </li>
-                              ))}
-                            </ul>
+                    {lessonData.gagne_events && lessonData.gagne_events.length > 0 ? (
+                      lessonData.gagne_events.map((event, index) => (
+                        <div key={index} className="border-l-4 border-primary-200 pl-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-semibold text-gray-900">
+                              Event {event.event_number}: {event.event_name}
+                            </h4>
+                            <Badge variant="default" size="sm">
+                              {formatDuration(event.duration_minutes)}
+                            </Badge>
                           </div>
-                        )}
+                          <p className="text-gray-600 text-sm mb-3">{event.description}</p>
 
-                        {event.materials_needed && event.materials_needed.length > 0 && (
-                          <div className="mb-3">
-                            <span className="text-sm font-medium text-gray-700">Materials:</span>
-                            <div className="flex flex-wrap gap-2 mt-1">
-                              {event.materials_needed.map((material, matIndex) => (
-                                <Badge key={matIndex} variant="secondary" size="sm">
-                                  {material}
-                                </Badge>
-                              ))}
+                          {event.activities && event.activities.length > 0 && (
+                            <div className="mb-3">
+                              <span className="text-sm font-medium text-gray-700">Activities:</span>
+                              <ul className="ml-4 mt-1 space-y-1">
+                                {event.activities.map((activity, actIndex) => (
+                                  <li key={actIndex} className="text-sm text-gray-600">
+                                    • {activity}
+                                  </li>
+                                ))}
+                              </ul>
                             </div>
-                          </div>
-                        )}
+                          )}
+
+                          {event.materials_needed && event.materials_needed.length > 0 && (
+                            <div className="mb-3">
+                              <span className="text-sm font-medium text-gray-700">Materials:</span>
+                              <div className="flex flex-wrap gap-2 mt-1">
+                                {event.materials_needed.map((material, matIndex) => (
+                                  <Badge key={matIndex} variant="secondary" size="sm">
+                                    {material}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8">
+                        <BookOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-500">No Gagne events found</p>
+                        <p className="text-sm text-gray-400 mt-1">
+                          Try regenerating the lesson or editing the content
+                        </p>
                       </div>
-                    ))}
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -669,11 +796,11 @@ const Results = () => {
                   <div className="space-y-4">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Total Objectives</span>
-                      <span className="font-semibold">{lessonData.objectives.length}</span>
+                      <span className="font-semibold">{currentObjectivesCount}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Bloom's Levels</span>
-                      <span className="font-semibold">{Object.keys(objectivesByBloom).length}</span>
+                      <span className="font-semibold">{bloomLevelsUsed.length}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Duration</span>
@@ -681,7 +808,7 @@ const Results = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Events</span>
-                      <span className="font-semibold">{lessonData.gagne_events.length}</span>
+                      <span className="font-semibold">{lessonData.gagne_events?.length || 0}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Optimal Objectives</span>
@@ -710,7 +837,7 @@ const Results = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {lessonData.lesson_plan.prerequisites && (
+                    {lessonData.lesson_plan?.prerequisites && lessonData.lesson_plan.prerequisites.length > 0 && (
                       <div>
                         <h5 className="font-medium text-gray-900 mb-2">Prerequisites</h5>
                         <ul className="text-sm text-gray-600 space-y-1">
@@ -721,7 +848,7 @@ const Results = () => {
                       </div>
                     )}
 
-                    {lessonData.lesson_plan.materials && (
+                    {lessonData.lesson_plan?.materials && lessonData.lesson_plan.materials.length > 0 && (
                       <div>
                         <h5 className="font-medium text-gray-900 mb-2">Materials</h5>
                         <div className="flex flex-wrap gap-2">
@@ -734,7 +861,7 @@ const Results = () => {
                       </div>
                     )}
 
-                    {lessonData.lesson_plan.assessment_methods && (
+                    {lessonData.lesson_plan?.assessment_methods && lessonData.lesson_plan.assessment_methods.length > 0 && (
                       <div>
                         <h5 className="font-medium text-gray-900 mb-2">Assessment</h5>
                         <ul className="text-sm text-gray-600 space-y-1">
