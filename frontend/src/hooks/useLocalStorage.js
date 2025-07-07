@@ -56,15 +56,25 @@ export function useLessonDraft() {
   }, [draft, autosaveEnabled]);
 
   const saveDraft = (lessonData) => {
-    const draftData = {
-      ...lessonData,
-      lastSaved: new Date().toISOString()
-    };
-    setDraft(draftData);
+    try {
+      const draftData = {
+        ...lessonData,
+        lastSaved: new Date().toISOString()
+      };
+      setDraft(draftData);
+      console.log('✅ Draft saved successfully to localStorage');
+    } catch (error) {
+      console.error('❌ Failed to save draft:', error);
+    }
   };
 
   const clearDraft = () => {
-    removeDraft();
+    try {
+      removeDraft();
+      console.log('✅ Draft cleared successfully');
+    } catch (error) {
+      console.error('❌ Failed to clear draft:', error);
+    }
   };
 
   const hasDraft = Boolean(draft);

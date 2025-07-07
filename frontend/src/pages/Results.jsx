@@ -23,7 +23,8 @@ const Results = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { exportToPDF, refineContent, loading } = useApi();
-  const { draft, clearDraft } = useLessonDraft();
+  // FIX: Added saveDraft to the destructuring
+  const { draft, clearDraft, saveDraft } = useLessonDraft();
 
   const [lessonData, setLessonData] = useState(location.state?.lessonData || draft);
   const [showPDFPreview, setShowPDFPreview] = useState(false);
@@ -86,12 +87,10 @@ const Results = () => {
       const result = await refineContent(refinementRequest);
       console.log('📥 Raw API result:', result);
 
-      // Dismiss loading toast
-      toast.dismiss(loadingToast);
-
       // Check if we got a valid response
       if (!result || !result.refined_content) {
         console.error('❌ No refined content in response');
+        toast.dismiss(loadingToast);
         throw new Error('No refined content received from API');
       }
 
@@ -105,6 +104,7 @@ const Results = () => {
       } catch (parseError) {
         console.error('❌ JSON parse error:', parseError);
         console.log('📄 Raw content that failed to parse:', result.refined_content);
+        toast.dismiss(loadingToast);
         throw new Error(`Failed to parse refined content as JSON: ${parseError.message}`);
       }
 
@@ -128,6 +128,7 @@ const Results = () => {
             console.log('✅ Updated objectives count:', updatedData.objectives.length);
           } else {
             console.error('❌ Refined data is not an array:', typeof refinedData);
+            toast.dismiss(loadingToast);
             throw new Error('Refined objectives data is not an array');
           }
           break;
@@ -143,6 +144,7 @@ const Results = () => {
             console.log('✅ Updated lesson plan');
           } else {
             console.error('❌ Refined data is not an object:', typeof refinedData);
+            toast.dismiss(loadingToast);
             throw new Error('Refined lesson plan data is not an object');
           }
           break;
@@ -163,16 +165,19 @@ const Results = () => {
             console.log('✅ Updated Gagne events count:', updatedData.gagne_events.length);
           } else {
             console.error('❌ Refined data is not an array:', typeof refinedData);
+            toast.dismiss(loadingToast);
             throw new Error('Refined Gagne events data is not an array');
           }
           break;
 
         default:
           console.error('❌ Unknown section type:', editingSection);
+          toast.dismiss(loadingToast);
           throw new Error(`Unknown section type: ${editingSection}`);
       }
 
       if (!updateSuccessful) {
+        toast.dismiss(loadingToast);
         throw new Error('Failed to update lesson data with refined content');
       }
 
@@ -189,12 +194,15 @@ const Results = () => {
       setRefinementInstructions('');
       setEditContent('');
 
+      // Dismiss loading toast BEFORE showing success
+      toast.dismiss(loadingToast);
+
       // Show success message
       console.log('🎉 Refinement completed successfully!');
       toast.success('Content refined successfully! ✅');
 
     } catch (error) {
-      // Dismiss loading toast
+      // Ensure loading toast is dismissed even if not done earlier
       toast.dismiss(loadingToast);
 
       console.error('💥 Refinement error occurred:');
@@ -269,7 +277,7 @@ const Results = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleEditSection('overview', lessonData.lesson_plan)}
+                    onClick={() => handleEditSection('lesson_plan', lessonData.lesson_plan)}
                   >
                     <Edit3 className="w-4 h-4" />
                   </Button>
