@@ -183,8 +183,10 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
             base_objectives = 3  # Standard: manageable cognitive load
         elif duration <= 90:
             base_objectives = 4  # Extended: can handle more complexity
+        elif duration <= 120:
+            base_objectives = 5  # Long sessions: can handle more
         else:
-            base_objectives = 5  # Long sessions: max for cognitive load
+            base_objectives = 6  # Very long sessions: max for cognitive load
 
         # Bloom's hierarchical complexity adjustment
         complexity_weight = self._calculate_cognitive_complexity(selected_levels)
@@ -193,7 +195,7 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
         if complexity_weight > 0.7:  # High complexity (Create, Evaluate dominant)
             base_objectives = max(2, base_objectives - 1)
         elif complexity_weight < 0.3:  # Low complexity (Remember, Understand dominant)
-            base_objectives = min(base_objectives + 1, 5)
+            base_objectives = min(base_objectives + 1, 6)
 
         # Academic level adjustment (scaffolding principle)
         level_adjustments = {
@@ -210,7 +212,7 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
 
         # Pedagogical constraints
         min_objectives = max(2, min(num_levels, 3))  # At least 2, max 3 for focus
-        max_objectives = 5  # Cognitive load limit
+        max_objectives = 6  # Updated cognitive load limit for longer sessions
 
         optimal_count = max(min_objectives, min(adjusted_objectives, max_objectives))
 
@@ -519,7 +521,8 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
             5: 0.20,  # Provide Guidance (more coaching needed)
             6: 0.25,  # Elicit Performance (largest for practical)
             7: 0.10,  # Provide Feedback (more important for skills)
-            8: 0.04  # Assess Performance
+            8: 0.04,  # Assess Performance
+            9: 0.06  # Enhance Retention
         }
 
         # Interpolate between theoretical and practical based on focus ratio
@@ -642,9 +645,9 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
         4. Assessment strategy (where applicable)
 
         CONTENT ADAPTATION:
-        {"- Focus on hands-on practice, problem-solving, and skill demonstration" if is_practical_focused else "- Focus on knowledge delivery, comprehension, and conceptual understanding"}
-        {"- Longer practice sessions (Events 5-6) with immediate feedback" if is_practical_focused else "- Detailed content presentation (Event 4) with scaffolded learning"}
-        {"- Performance-based assessment throughout" if is_practical_focused else "- Knowledge-based assessment and retention activities"}
+        {("- Focus on hands-on practice, problem-solving, and skill demonstration" if is_practical_focused else "- Focus on knowledge delivery, comprehension, and conceptual understanding")}
+        {("- Longer practice sessions (Events 5-6) with immediate feedback" if is_practical_focused else "- Detailed content presentation (Event 4) with scaffolded learning")}
+        {("- Performance-based assessment throughout" if is_practical_focused else "- Knowledge-based assessment and retention activities")}
 
         The 9 Events you MUST include:
         1. Gain Attention ({time_distribution[1]} min) - Capture student interest and focus
@@ -737,6 +740,10 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
     async def refine_content(self, request: RefineRequest) -> Dict[str, Any]:
         """Refine specific sections of the lesson content"""
 
+        # Special handling for duration changes
+        if request.section_type == 'duration_change':
+            return await self._handle_duration_change(request)
+
         prompt = f"""
         You are an expert instructional designer. Refine the following {request.section_type} content based on the user's instructions.
 
@@ -809,6 +816,138 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
         except Exception as e:
             print(f"Error in content refinement: {e}")
             # Return original content if refinement fails
+            return {"refined_content": request.section_content}
+
+    async def _handle_duration_change(self, request: RefineRequest) -> Dict[str, Any]:
+        """Handle lesson duration changes with proper time redistribution and objective recalculation"""
+
+        try:
+            current_data = json.loads(request.section_content)
+            new_duration = current_data['new_duration']
+            current_duration = current_data['current_duration']
+
+            # Extract lesson context information
+            lesson_context = request.lesson_context
+            course_title = lesson_context.get('course_title', '')
+            lesson_topic = lesson_context.get('lesson_topic', '')
+            grade_level = lesson_context.get('grade_level', 'junior')
+            preliminary_objectives = lesson_context.get('preliminary_objectives', '')
+            selected_bloom_levels = lesson_context.get('selected_bloom_levels', [])
+
+            # Create a mock request object for recalculating objectives and time distribution
+            mock_request = type('MockRequest', (), {
+                'course_title': course_title,
+                'lesson_topic': lesson_topic,
+                'duration_minutes': new_duration,
+                'grade_level': grade_level,
+                'preliminary_objectives': preliminary_objectives,
+                'selected_bloom_levels': [type('MockLevel', (), {'value': level})()
+                                          for level in selected_bloom_levels]
+            })()
+
+            # Recalculate optimal objectives count for new duration
+            new_objectives_count = self._calculate_optimal_objectives_count(mock_request)
+            current_objectives_count = len(current_data.get('current_objectives', []))
+
+            # Recalculate time distribution for new duration
+            new_time_distribution = self._calculate_gagne_time_distribution(mock_request)
+
+            # Format grade level properly
+            grade_level_display = {
+                "freshman": "freshman",
+                "sophomore": "sophomore",
+                "junior": "junior",
+                "senior": "senior",
+                "masters": "master's",
+                "postgrad": "postgraduate"
+            }.get(grade_level, grade_level)
+
+            # Determine if objectives need to be recalculated
+            objective_change_needed = abs(new_objectives_count - current_objectives_count) >= 1
+
+            # Format the selected bloom levels for the prompt
+            bloom_levels_text = ', '.join(selected_bloom_levels)
+
+            prompt = f"""
+            Adjust this lesson from {current_duration} minutes to {new_duration} minutes.
+
+            CURRENT LESSON DATA:
+            - Current Objectives Count: {current_objectives_count}
+            - Optimal Objectives for {new_duration} min: {new_objectives_count}
+            - Selected Bloom's Levels: {bloom_levels_text}
+            - Course: {course_title}
+            - Topic: {lesson_topic}
+            - Grade Level: {grade_level_display}
+
+            CURRENT GAGNE EVENTS: {json.dumps(current_data['gagne_events'], indent=2)}
+
+            NEW TIME DISTRIBUTION (MUST USE EXACTLY):
+            {self._format_time_distribution_guidance(new_time_distribution, new_duration)}
+
+            OBJECTIVE ADJUSTMENT NEEDED: {"Yes" if objective_change_needed else "No"}
+            {f"- Recommended count change: {current_objectives_count} → {new_objectives_count} objectives" if objective_change_needed else "- Keep current number of objectives"}
+
+            REQUIREMENTS:
+            1. Keep all 9 Gagne events with the same names and purposes
+            2. Adjust activities within each event to fit the new duration
+            3. Use EXACTLY the duration specified for each event above
+            4. Maintain pedagogical quality while scaling content
+            5. Update the lesson overview to mention the new {new_duration}-minute duration
+            6. Use "{grade_level_display}" when referring to student level, not template variables
+            {f"7. Recalculate learning objectives for optimal cognitive load with {new_objectives_count} total objectives" if objective_change_needed else "7. Keep existing objectives but ensure they're achievable in the new timeframe"}
+            {f"8. Distribute objectives across Bloom's levels: {bloom_levels_text}" if objective_change_needed else ""}
+
+            Return JSON with:
+            {{
+                "gagne_events": [array of 9 updated events with new durations],
+                "overview": "Updated overview text mentioning {new_duration} minutes and {grade_level_display} students",
+                **({
+                    "objectives": [f"{new_objectives_count} recalculated objectives with proper Bloom's distribution"]
+                } if objective_change_needed else {
+                    "objectives_note": "Existing objectives maintained - no recalculation needed"
+                })
+                "duration_change_summary": {{
+                    "old_duration": {current_duration},
+                    "new_duration": {new_duration},
+                    "objectives_changed": {str(objective_change_needed).lower()},
+                    "old_objectives_count": {current_objectives_count},
+                    "new_objectives_count": {new_objectives_count if objective_change_needed else current_objectives_count}
+                }}
+            }}
+            """
+
+            response = await self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system",
+                     "content": "You are an expert at adjusting lesson timing and objectives while maintaining pedagogical quality. Return only valid JSON. Never use template variables like 'GradeLevel.MASTERS'. When recalculating objectives, ensure proper Bloom's taxonomy distribution."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=5000  # Increased for objective recalculation
+            )
+
+            result = response.choices[0].message.content.strip()
+
+            # Clean the response
+            if result.startswith('```json'):
+                result = result.replace('```json', '').replace('```', '').strip()
+            elif result.startswith('```'):
+                result = result.replace('```', '').strip()
+
+            # Post-process to clean up any template variables
+            result = result.replace('GradeLevel.MASTERS', 'master\'s')
+            result = result.replace('GradeLevel.FRESHMAN', 'freshman')
+            result = result.replace('GradeLevel.SOPHOMORE', 'sophomore')
+            result = result.replace('GradeLevel.JUNIOR', 'junior')
+            result = result.replace('GradeLevel.SENIOR', 'senior')
+            result = result.replace('GradeLevel.POSTGRAD', 'postgraduate')
+            result = result.replace('GradeLevel.', '')
+
+            return {"refined_content": result}
+
+        except Exception as e:
+            print(f"Error in duration change: {e}")
             return {"refined_content": request.section_content}
 
     def _create_fallback_lesson_plan(self, request: LessonRequest) -> LessonPlan:
