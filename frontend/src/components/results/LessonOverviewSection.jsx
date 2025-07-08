@@ -114,7 +114,12 @@ const LessonOverviewSection = ({
 
           <div className="space-y-3">
             <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Overview</h4>
-            <p className="text-gray-700 leading-relaxed">{cleanOverviewText(lessonData.lesson_plan.overview)}</p>
+            <div
+              className="text-gray-700 leading-relaxed prose prose-sm max-w-none"
+              dangerouslySetInnerHTML={{
+                __html: cleanOverviewText(lessonData.lesson_plan.overview)
+              }}
+            />
           </div>
 
           <div className="mt-6">
