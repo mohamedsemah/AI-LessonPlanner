@@ -78,9 +78,11 @@ const Results = () => {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Your Lesson Plan</h1>
-            <p className="text-gray-600">
-              {lessonData.lesson_info.course_title} - {lessonData.lesson_info.lesson_topic}
-            </p>
+            {lessonData.lesson_plan?.title && (
+              <h2 className="text-xl font-semibold text-gray-800">
+                {lessonData.lesson_plan.title}
+              </h2>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={() => navigate('/create')} className="flex items-center gap-2">
