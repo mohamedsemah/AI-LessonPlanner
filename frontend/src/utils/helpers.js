@@ -606,184 +606,288 @@ export function safeLocalStorage() {
 }
 
 /**
- * Validate objective structure and normalize it
+ * Enhanced time redistribution helpers
  */
-export function validateObjectiveStructure(obj, index = 0) {
-  const validLevels = ['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'];
 
-  let bloomLevel = (obj.bloom_level || obj.level || 'understand').toLowerCase();
-  if (!validLevels.includes(bloomLevel)) {
-    console.warn(`Invalid bloom level: ${bloomLevel}, defaulting to 'understand'`);
-    bloomLevel = 'understand';
+/**
+ * Analyze time imbalance and suggest redistribution strategies
+ */
+export function analyzeTimeImbalance(events, targetDuration) {
+  const currentTotal = calculateTotalDuration(events);
+  const timeDifference = currentTotal - targetDuration;
+
+  if (Math.abs(timeDifference) <= 1) {
+    return {
+      needsRedistribution: false,
+      timeDifference: 0,
+      severity: 'none'
+    };
   }
 
+  const severity = Math.abs(timeDifference) <= 5 ? 'minor' :
+                   Math.abs(timeDifference) <= 15 ? 'moderate' : 'major';
+
   return {
-    bloom_level: bloomLevel,
-    objective: obj.objective || obj.description || `Learning objective ${index + 1}`,
-    action_verb: obj.action_verb || obj.verb || obj.action || 'understand',
-    content: obj.content || obj.topic || 'core concepts',
-    condition: obj.condition || null,
-    criteria: obj.criteria || null
+    needsRedistribution: true,
+    timeDifference,
+    severity,
+    recommendation: getRedistributionRecommendation(timeDifference, severity)
   };
 }
 
 /**
- * Extract unique Bloom levels from objectives
+ * Get redistribution recommendation based on time difference
  */
-export function extractBloomLevelsFromObjectives(objectives) {
-  if (!objectives || !Array.isArray(objectives)) return [];
-  return [...new Set(objectives.map(obj => obj.bloom_level).filter(Boolean))];
+function getRedistributionRecommendation(timeDifference, severity) {
+  const isOvertime = timeDifference > 0;
+
+  switch (severity) {
+    case 'minor':
+      return {
+        strategy: 'adjacent',
+        message: `${isOvertime ? 'Reduce' : 'Increase'} time in nearby events to maintain lesson flow`,
+        priority: 'low'
+      };
+    case 'moderate':
+      return {
+        strategy: 'pedagogical',
+        message: `Apply pedagogical priorities to ${isOvertime ? 'compress' : 'expand'} appropriate events`,
+        priority: 'medium'
+      };
+    case 'major':
+      return {
+        strategy: 'comprehensive',
+        message: `Significant restructuring needed - consider revising lesson scope or duration`,
+        priority: 'high'
+      };
+    default:
+      return {
+        strategy: 'proportional',
+        message: 'Apply balanced redistribution across all events',
+        priority: 'medium'
+      };
+  }
 }
 
 /**
- * Ensure lesson data consistency
+ * Format redistribution summary for user display
  */
-export function ensureLessonDataConsistency(lessonData) {
-  if (!lessonData) return null;
+export function formatRedistributionSummary(redistributionResult) {
+  if (!redistributionResult || !redistributionResult.adjustments) {
+    return 'No time adjustments were made.';
+  }
 
-  // Ensure objectives are properly structured
-  const validatedObjectives = (lessonData.objectives || []).map(validateObjectiveStructure);
+  const { strategy, adjustments, timeDifference, finalDifference } = redistributionResult;
+  const adjustmentCount = adjustments.length;
 
-  // Extract bloom levels from objectives
-  const bloomLevelsFromObjectives = extractBloomLevelsFromObjectives(validatedObjectives);
+  if (adjustmentCount === 0) {
+    return 'Time was already balanced - no adjustments needed.';
+  }
 
-  return {
-    ...lessonData,
-    objectives: validatedObjectives,
-    lesson_info: {
-      ...lessonData.lesson_info,
-      selected_bloom_levels: bloomLevelsFromObjectives
+  const strategyNames = {
+    'adjacent': 'Adjacent Events Strategy',
+    'pedagogical': 'Pedagogical Priority Strategy',
+    'proportional': 'Proportional Distribution Strategy'
+  };
+
+  const strategyName = strategyNames[strategy] || 'Smart Auto-Balance';
+  const accuracy = finalDifference <= 1 ? 'perfect balance' : `±${finalDifference} minute${finalDifference !== 1 ? 's' : ''} difference`;
+
+  return `${strategyName} applied: ${adjustmentCount} event${adjustmentCount !== 1 ? 's' : ''} adjusted, ${accuracy} achieved.`;
+}
+
+/**
+ * Get event flexibility score for redistribution
+ */
+export function getEventFlexibility(eventNumber, lessonFocus = 'balanced') {
+  const flexibilityScores = {
+    theoretical: {
+      1: 0.3, 2: 0.8, 3: 0.5, 4: 0.2, 5: 0.6,
+      6: 0.4, 7: 0.7, 8: 0.5, 9: 0.8
+    },
+    practical: {
+      1: 0.4, 2: 0.9, 3: 0.6, 4: 0.4, 5: 0.3,
+      6: 0.2, 7: 0.3, 8: 0.4, 9: 0.7
+    },
+    balanced: {
+      1: 0.35, 2: 0.85, 3: 0.55, 4: 0.3, 5: 0.45,
+      6: 0.3, 7: 0.5, 8: 0.45, 9: 0.75
     }
   };
+
+  return flexibilityScores[lessonFocus]?.[eventNumber] || 0.5;
 }
 
 /**
- * Calculate optimal objectives count based on duration and cognitive load theory
+ * Validate Gagne events structure
  */
-export function calculateOptimalObjectivesCount(duration) {
-  if (duration <= 30) return 2;
-  if (duration <= 60) return 3;
-  if (duration <= 90) return 4;
-  if (duration <= 120) return 5;
-  return 6;
-}
+export function validateGagneEvents(events) {
+  const errors = [];
 
-/**
- * Format lesson data for API request
- */
-export function formatLessonDataForAPI(lessonData) {
-  return {
-    lesson_data: {
-      ...lessonData,
-      // Ensure all arrays are properly formatted
-      objectives: lessonData.objectives?.map(obj => ({
-        ...obj,
-        bloom_level: obj.bloom_level?.toLowerCase()
-      })) || [],
-      gagne_events: lessonData.gagne_events?.map(event => ({
-        ...event,
-        activities: Array.isArray(event.activities) ? event.activities : [event.activities].filter(Boolean),
-        materials_needed: Array.isArray(event.materials_needed) ? event.materials_needed : [event.materials_needed].filter(Boolean)
-      })) || []
+  if (!Array.isArray(events)) {
+    errors.push('Events must be an array');
+    return { isValid: false, errors };
+  }
+
+  if (events.length !== 9) {
+    errors.push(`Expected 9 events, got ${events.length}`);
+  }
+
+  events.forEach((event, index) => {
+    if (!event.event_number || event.event_number !== index + 1) {
+      errors.push(`Event ${index + 1} has incorrect event_number: ${event.event_number}`);
     }
+
+    if (!event.event_name || typeof event.event_name !== 'string') {
+      errors.push(`Event ${index + 1} missing or invalid event_name`);
+    }
+
+    if (!event.duration_minutes || event.duration_minutes < 1) {
+      errors.push(`Event ${index + 1} has invalid duration: ${event.duration_minutes}`);
+    }
+
+    if (!Array.isArray(event.activities) || event.activities.length === 0) {
+      errors.push(`Event ${index + 1} missing or empty activities array`);
+    }
+  });
+
+  return {
+    isValid: errors.length === 0,
+    errors
   };
 }
 
 /**
- * Merge lesson data updates while preserving structure
+ * Calculate pedagogical balance score
  */
-export function mergeLessonDataUpdates(currentData, updates) {
-  const merged = deepClone(currentData);
+export function calculatePedagogicalBalance(events) {
+  // Calculate time distribution across pedagogical phases
+  const phases = {
+    preparation: [1, 2, 3], // Gain attention, inform objectives, stimulate recall
+    delivery: [4, 5],       // Present content, provide guidance
+    practice: [6, 7],       // Elicit performance, provide feedback
+    assessment: [8, 9]      // Assess performance, enhance retention
+  };
 
-  // Handle different update types
-  if (updates.objectives) {
-    merged.objectives = updates.objectives.map(validateObjectiveStructure);
-    merged.lesson_info.selected_bloom_levels = extractBloomLevelsFromObjectives(merged.objectives);
-  }
+  const totalDuration = calculateTotalDuration(events);
+  const phaseDistribution = {};
 
-  if (updates.lesson_plan) {
-    merged.lesson_plan = { ...merged.lesson_plan, ...updates.lesson_plan };
-  }
+  Object.entries(phases).forEach(([phase, eventNumbers]) => {
+    const phaseTime = eventNumbers.reduce((sum, eventNum) => {
+      const event = events.find(e => e.event_number === eventNum);
+      return sum + (event ? event.duration_minutes : 0);
+    }, 0);
 
-  if (updates.gagne_events) {
-    merged.gagne_events = updates.gagne_events;
-  }
+    phaseDistribution[phase] = {
+      minutes: phaseTime,
+      percentage: totalDuration > 0 ? (phaseTime / totalDuration) * 100 : 0
+    };
+  });
 
-  if (updates.duration_minutes || updates.total_duration) {
-    const newDuration = updates.duration_minutes || updates.total_duration;
-    merged.lesson_info.duration_minutes = newDuration;
-    merged.total_duration = newDuration;
-  }
+  // Ideal distribution (research-based)
+  const idealDistribution = {
+    preparation: 20,  // 20%
+    delivery: 40,     // 40%
+    practice: 30,     // 30%
+    assessment: 10    // 10%
+  };
 
-  return merged;
+  // Calculate balance score (0-100, higher is better)
+  let balanceScore = 100;
+  Object.entries(idealDistribution).forEach(([phase, idealPercentage]) => {
+    const actualPercentage = phaseDistribution[phase].percentage;
+    const deviation = Math.abs(actualPercentage - idealPercentage);
+    balanceScore -= deviation * 2; // Penalize deviation
+  });
+
+  return {
+    score: Math.max(0, Math.round(balanceScore)),
+    distribution: phaseDistribution,
+    recommendations: generateBalanceRecommendations(phaseDistribution, idealDistribution)
+  };
 }
 
 /**
- * Validate lesson data structure
+ * Generate recommendations for improving pedagogical balance
  */
-export function validateLessonDataStructure(lessonData) {
-  const issues = [];
+function generateBalanceRecommendations(actual, ideal) {
+  const recommendations = [];
 
+  Object.entries(ideal).forEach(([phase, idealPercentage]) => {
+    const actualPercentage = actual[phase].percentage;
+    const difference = actualPercentage - idealPercentage;
+
+    if (Math.abs(difference) > 5) { // Significant deviation
+      if (difference > 0) {
+        recommendations.push({
+          phase,
+          type: 'reduce',
+          message: `Consider reducing ${phase} time by ${Math.round(difference)}%`,
+          severity: Math.abs(difference) > 10 ? 'high' : 'medium'
+        });
+      } else {
+        recommendations.push({
+          phase,
+          type: 'increase',
+          message: `Consider increasing ${phase} time by ${Math.round(Math.abs(difference))}%`,
+          severity: Math.abs(difference) > 10 ? 'high' : 'medium'
+        });
+      }
+    }
+  });
+
+  return recommendations;
+}
+
+/**
+ * Enhanced lesson data validation with pedagogical insights
+ */
+export function validateLessonDataComprehensive(lessonData) {
+  const validation = {
+    isValid: true,
+    errors: [],
+    warnings: [],
+    insights: {}
+  };
+
+  // Basic structure validation
   if (!lessonData) {
-    issues.push('Lesson data is null or undefined');
-    return { isValid: false, issues };
+    validation.errors.push('Lesson data is missing');
+    validation.isValid = false;
+    return validation;
   }
 
-  // Check required fields
-  if (!lessonData.lesson_info) {
-    issues.push('Missing lesson_info');
-  } else {
-    if (!lessonData.lesson_info.course_title) issues.push('Missing course_title');
-    if (!lessonData.lesson_info.lesson_topic) issues.push('Missing lesson_topic');
-    if (!lessonData.lesson_info.grade_level) issues.push('Missing grade_level');
-    if (!lessonData.lesson_info.duration_minutes) issues.push('Missing duration_minutes');
+  // Validate objectives
+  if (!lessonData.objectives || lessonData.objectives.length === 0) {
+    validation.errors.push('No learning objectives found');
+    validation.isValid = false;
   }
 
-  // Check objectives
-  if (!lessonData.objectives || !Array.isArray(lessonData.objectives)) {
-    issues.push('Objectives must be an array');
-  } else if (lessonData.objectives.length === 0) {
-    issues.push('At least one objective is required');
+  // Validate Gagne events
+  const gagneValidation = validateGagneEvents(lessonData.gagne_events || []);
+  if (!gagneValidation.isValid) {
+    validation.errors.push(...gagneValidation.errors);
+    validation.isValid = false;
   }
 
-  // Check Gagne events
-  if (!lessonData.gagne_events || !Array.isArray(lessonData.gagne_events)) {
-    issues.push('Gagne events must be an array');
-  } else if (lessonData.gagne_events.length !== 9) {
-    issues.push('Must have exactly 9 Gagne events');
+  // Calculate pedagogical insights
+  if (lessonData.gagne_events) {
+    validation.insights.pedagogicalBalance = calculatePedagogicalBalance(lessonData.gagne_events);
+
+    if (validation.insights.pedagogicalBalance.score < 70) {
+      validation.warnings.push('Pedagogical balance could be improved');
+    }
   }
 
-  // Check lesson plan
-  if (!lessonData.lesson_plan) {
-    issues.push('Missing lesson_plan');
+  // Time distribution analysis
+  if (lessonData.gagne_events && lessonData.total_duration) {
+    const timeAnalysis = analyzeTimeImbalance(lessonData.gagne_events, lessonData.total_duration);
+    validation.insights.timeBalance = timeAnalysis;
+
+    if (timeAnalysis.needsRedistribution && timeAnalysis.severity !== 'minor') {
+      validation.warnings.push(`Time imbalance detected: ${timeAnalysis.recommendation.message}`);
+    }
   }
 
-  return {
-    isValid: issues.length === 0,
-    issues
-  };
-}
-
-/**
- * Generate lesson summary for display
- */
-export function generateLessonSummary(lessonData) {
-  if (!lessonData) return null;
-
-  const objectivesCount = lessonData.objectives?.length || 0;
-  const bloomLevels = extractBloomLevelsFromObjectives(lessonData.objectives || []);
-  const duration = lessonData.total_duration || lessonData.lesson_info?.duration_minutes || 0;
-  const eventsCount = lessonData.gagne_events?.length || 0;
-
-  return {
-    title: `${lessonData.lesson_info?.course_title} - ${lessonData.lesson_info?.lesson_topic}`,
-    duration: formatDuration(duration),
-    objectives_count: objectivesCount,
-    bloom_levels_count: bloomLevels.length,
-    bloom_levels: bloomLevels.map(capitalize).join(', '),
-    events_count: eventsCount,
-    grade_level: formatGradeLevel(lessonData.lesson_info?.grade_level),
-    optimal_objectives: calculateOptimalObjectivesCount(duration),
-    is_optimized: Math.abs(objectivesCount - calculateOptimalObjectivesCount(duration)) <= 1
-  };
+  return validation;
 }
