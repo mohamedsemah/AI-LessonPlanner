@@ -14,7 +14,7 @@ import LessonOverviewSection from '../components/results/LessonOverviewSection';
 import LearningObjectivesSection from '../components/results/LearningObjectivesSection';
 import GagneEventsSection from '../components/results/GagneEventsSection';
 import SidebarSection from '../components/results/SidebarSection';
-import ResultsModals from '../components/results/ResultsModals';
+import WYSIWYGEditingModals from '../components/results/WYSIWYGEditingModals';
 
 const Results = () => {
   const location = useLocation();
@@ -25,7 +25,6 @@ const Results = () => {
   const [lessonData, setLessonData] = useState(location.state?.lessonData || draft);
   const [showPDFPreview, setShowPDFPreview] = useState(false);
   const [editingSection, setEditingSection] = useState(null);
-  const [editContent, setEditContent] = useState('');
   const [refinementInstructions, setRefinementInstructions] = useState('');
   const [showDurationModal, setShowDurationModal] = useState(false);
   const [newDuration, setNewDuration] = useState('');
@@ -63,8 +62,6 @@ const Results = () => {
     loading,
     editingSection,
     setEditingSection,
-    editContent,
-    setEditContent,
     refinementInstructions,
     setRefinementInstructions,
     originalGagneEvents,
@@ -112,7 +109,7 @@ const Results = () => {
           </div>
         </div>
 
-        <ResultsModals
+        <WYSIWYGEditingModals
           {...commonProps}
           showDurationModal={showDurationModal}
           setShowDurationModal={setShowDurationModal}
