@@ -474,6 +474,7 @@ const WYSIWYGEditingModals = ({
                     label="Lesson Title"
                     value={editingLessonPlan.title || ''}
                     onChange={(e) => setEditingLessonPlan({...editingLessonPlan, title: e.target.value})}
+                    placeholder="Enter a descriptive title for your lesson..."
                   />
 
                   <div>
@@ -507,6 +508,30 @@ const WYSIWYGEditingModals = ({
                     value={Array.isArray(editingLessonPlan.assessment_methods) ? editingLessonPlan.assessment_methods.join('\n') : ''}
                     onChange={(e) => setEditingLessonPlan({...editingLessonPlan, assessment_methods: e.target.value.split('\n').filter(a => a.trim())})}
                     placeholder="Quiz, discussion, project..."
+                    rows={3}
+                  />
+
+                  <Textarea
+                    label="Differentiation Strategies (one per line)"
+                    value={Array.isArray(editingLessonPlan.differentiation_strategies) ? editingLessonPlan.differentiation_strategies.join('\n') : ''}
+                    onChange={(e) => setEditingLessonPlan({...editingLessonPlan, differentiation_strategies: e.target.value.split('\n').filter(d => d.trim())})}
+                    placeholder="Visual aids, multiple learning modalities..."
+                    rows={3}
+                  />
+
+                  <Textarea
+                    label="Technology Requirements (one per line)"
+                    value={Array.isArray(editingLessonPlan.technology_requirements) ? editingLessonPlan.technology_requirements.join('\n') : ''}
+                    onChange={(e) => setEditingLessonPlan({...editingLessonPlan, technology_requirements: e.target.value.split('\n').filter(t => t.trim())})}
+                    placeholder="Computer/tablet, Internet access..."
+                    rows={3}
+                  />
+
+                  <Textarea
+                    label="Closure Activities (one per line)"
+                    value={Array.isArray(editingLessonPlan.closure_activities) ? editingLessonPlan.closure_activities.join('\n') : ''}
+                    onChange={(e) => setEditingLessonPlan({...editingLessonPlan, closure_activities: e.target.value.split('\n').filter(c => c.trim())})}
+                    placeholder="Summary discussion, Q&A session..."
                     rows={3}
                   />
                 </div>
