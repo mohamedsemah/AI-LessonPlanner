@@ -604,3 +604,186 @@ export function safeLocalStorage() {
     }
   };
 }
+
+/**
+ * Validate objective structure and normalize it
+ */
+export function validateObjectiveStructure(obj, index = 0) {
+  const validLevels = ['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'];
+
+  let bloomLevel = (obj.bloom_level || obj.level || 'understand').toLowerCase();
+  if (!validLevels.includes(bloomLevel)) {
+    console.warn(`Invalid bloom level: ${bloomLevel}, defaulting to 'understand'`);
+    bloomLevel = 'understand';
+  }
+
+  return {
+    bloom_level: bloomLevel,
+    objective: obj.objective || obj.description || `Learning objective ${index + 1}`,
+    action_verb: obj.action_verb || obj.verb || obj.action || 'understand',
+    content: obj.content || obj.topic || 'core concepts',
+    condition: obj.condition || null,
+    criteria: obj.criteria || null
+  };
+}
+
+/**
+ * Extract unique Bloom levels from objectives
+ */
+export function extractBloomLevelsFromObjectives(objectives) {
+  if (!objectives || !Array.isArray(objectives)) return [];
+  return [...new Set(objectives.map(obj => obj.bloom_level).filter(Boolean))];
+}
+
+/**
+ * Ensure lesson data consistency
+ */
+export function ensureLessonDataConsistency(lessonData) {
+  if (!lessonData) return null;
+
+  // Ensure objectives are properly structured
+  const validatedObjectives = (lessonData.objectives || []).map(validateObjectiveStructure);
+
+  // Extract bloom levels from objectives
+  const bloomLevelsFromObjectives = extractBloomLevelsFromObjectives(validatedObjectives);
+
+  return {
+    ...lessonData,
+    objectives: validatedObjectives,
+    lesson_info: {
+      ...lessonData.lesson_info,
+      selected_bloom_levels: bloomLevelsFromObjectives
+    }
+  };
+}
+
+/**
+ * Calculate optimal objectives count based on duration and cognitive load theory
+ */
+export function calculateOptimalObjectivesCount(duration) {
+  if (duration <= 30) return 2;
+  if (duration <= 60) return 3;
+  if (duration <= 90) return 4;
+  if (duration <= 120) return 5;
+  return 6;
+}
+
+/**
+ * Format lesson data for API request
+ */
+export function formatLessonDataForAPI(lessonData) {
+  return {
+    lesson_data: {
+      ...lessonData,
+      // Ensure all arrays are properly formatted
+      objectives: lessonData.objectives?.map(obj => ({
+        ...obj,
+        bloom_level: obj.bloom_level?.toLowerCase()
+      })) || [],
+      gagne_events: lessonData.gagne_events?.map(event => ({
+        ...event,
+        activities: Array.isArray(event.activities) ? event.activities : [event.activities].filter(Boolean),
+        materials_needed: Array.isArray(event.materials_needed) ? event.materials_needed : [event.materials_needed].filter(Boolean)
+      })) || []
+    }
+  };
+}
+
+/**
+ * Merge lesson data updates while preserving structure
+ */
+export function mergeLessonDataUpdates(currentData, updates) {
+  const merged = deepClone(currentData);
+
+  // Handle different update types
+  if (updates.objectives) {
+    merged.objectives = updates.objectives.map(validateObjectiveStructure);
+    merged.lesson_info.selected_bloom_levels = extractBloomLevelsFromObjectives(merged.objectives);
+  }
+
+  if (updates.lesson_plan) {
+    merged.lesson_plan = { ...merged.lesson_plan, ...updates.lesson_plan };
+  }
+
+  if (updates.gagne_events) {
+    merged.gagne_events = updates.gagne_events;
+  }
+
+  if (updates.duration_minutes || updates.total_duration) {
+    const newDuration = updates.duration_minutes || updates.total_duration;
+    merged.lesson_info.duration_minutes = newDuration;
+    merged.total_duration = newDuration;
+  }
+
+  return merged;
+}
+
+/**
+ * Validate lesson data structure
+ */
+export function validateLessonDataStructure(lessonData) {
+  const issues = [];
+
+  if (!lessonData) {
+    issues.push('Lesson data is null or undefined');
+    return { isValid: false, issues };
+  }
+
+  // Check required fields
+  if (!lessonData.lesson_info) {
+    issues.push('Missing lesson_info');
+  } else {
+    if (!lessonData.lesson_info.course_title) issues.push('Missing course_title');
+    if (!lessonData.lesson_info.lesson_topic) issues.push('Missing lesson_topic');
+    if (!lessonData.lesson_info.grade_level) issues.push('Missing grade_level');
+    if (!lessonData.lesson_info.duration_minutes) issues.push('Missing duration_minutes');
+  }
+
+  // Check objectives
+  if (!lessonData.objectives || !Array.isArray(lessonData.objectives)) {
+    issues.push('Objectives must be an array');
+  } else if (lessonData.objectives.length === 0) {
+    issues.push('At least one objective is required');
+  }
+
+  // Check Gagne events
+  if (!lessonData.gagne_events || !Array.isArray(lessonData.gagne_events)) {
+    issues.push('Gagne events must be an array');
+  } else if (lessonData.gagne_events.length !== 9) {
+    issues.push('Must have exactly 9 Gagne events');
+  }
+
+  // Check lesson plan
+  if (!lessonData.lesson_plan) {
+    issues.push('Missing lesson_plan');
+  }
+
+  return {
+    isValid: issues.length === 0,
+    issues
+  };
+}
+
+/**
+ * Generate lesson summary for display
+ */
+export function generateLessonSummary(lessonData) {
+  if (!lessonData) return null;
+
+  const objectivesCount = lessonData.objectives?.length || 0;
+  const bloomLevels = extractBloomLevelsFromObjectives(lessonData.objectives || []);
+  const duration = lessonData.total_duration || lessonData.lesson_info?.duration_minutes || 0;
+  const eventsCount = lessonData.gagne_events?.length || 0;
+
+  return {
+    title: `${lessonData.lesson_info?.course_title} - ${lessonData.lesson_info?.lesson_topic}`,
+    duration: formatDuration(duration),
+    objectives_count: objectivesCount,
+    bloom_levels_count: bloomLevels.length,
+    bloom_levels: bloomLevels.map(capitalize).join(', '),
+    events_count: eventsCount,
+    grade_level: formatGradeLevel(lessonData.lesson_info?.grade_level),
+    optimal_objectives: calculateOptimalObjectivesCount(duration),
+    is_optimized: Math.abs(objectivesCount - calculateOptimalObjectivesCount(duration)) <= 1
+  };
+}

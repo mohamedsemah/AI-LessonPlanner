@@ -20,6 +20,50 @@ import {
 } from '../utils/helpers';
 import { TOAST_MESSAGES } from '../utils/constants';
 
+// Helper functions for data validation and consistency
+const validateObjectiveStructure = (obj, index) => {
+  const validLevels = ['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'];
+
+  let bloomLevel = (obj.bloom_level || obj.level || 'understand').toLowerCase();
+  if (!validLevels.includes(bloomLevel)) {
+    console.warn(`Invalid bloom level: ${bloomLevel}, defaulting to 'understand'`);
+    bloomLevel = 'understand';
+  }
+
+  return {
+    bloom_level: bloomLevel,
+    objective: obj.objective || obj.description || `Learning objective ${index + 1}`,
+    action_verb: obj.action_verb || obj.verb || obj.action || 'understand',
+    content: obj.content || obj.topic || 'core concepts',
+    condition: obj.condition || null,
+    criteria: obj.criteria || null
+  };
+};
+
+// Extract unique Bloom levels from objectives
+const extractBloomLevelsFromObjectives = (objectives) => {
+  if (!objectives || !Array.isArray(objectives)) return [];
+  return [...new Set(objectives.map(obj => obj.bloom_level).filter(Boolean))];
+};
+
+// Ensure lesson data consistency
+const ensureLessonDataConsistency = (lessonData) => {
+  // Ensure objectives are properly structured
+  const validatedObjectives = (lessonData.objectives || []).map(validateObjectiveStructure);
+
+  // Extract bloom levels from objectives
+  const bloomLevelsFromObjectives = extractBloomLevelsFromObjectives(validatedObjectives);
+
+  return {
+    ...lessonData,
+    objectives: validatedObjectives,
+    lesson_info: {
+      ...lessonData.lesson_info,
+      selected_bloom_levels: bloomLevelsFromObjectives
+    }
+  };
+};
+
 const Results = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -40,12 +84,22 @@ const Results = () => {
     if (!lessonData) {
       navigate('/create');
     } else {
+      // Ensure data consistency when component loads
+      const consistentData = ensureLessonDataConsistency(lessonData);
+
+      // Only update state if there were changes
+      if (JSON.stringify(consistentData) !== JSON.stringify(lessonData)) {
+        console.log('🔧 Fixing lesson data consistency on load');
+        setLessonData(consistentData);
+        saveDraft(consistentData);
+      }
+
       // Debug logging to see the data structure
-      console.log('📊 Lesson Data Structure:', lessonData);
-      console.log('🎯 Objectives Data:', lessonData.objectives);
-      console.log('📝 First Objective Sample:', lessonData.objectives?.[0]);
+      console.log('📊 Lesson Data Structure:', consistentData);
+      console.log('🎯 Objectives Data:', consistentData.objectives);
+      console.log('🏷️ Bloom Levels:', consistentData.lesson_info.selected_bloom_levels);
     }
-  }, [lessonData, navigate]);
+  }, [lessonData?.id]); // Use a stable identifier to prevent infinite loops
 
   if (!lessonData) {
     return null;
@@ -82,7 +136,7 @@ const Results = () => {
     return 6;
   };
 
-const handleDurationChange = async () => {
+  const handleDurationChange = async () => {
     const durationMinutes = parseInt(newDuration);
 
     if (!durationMinutes || durationMinutes < 5 || durationMinutes > 480) {
@@ -142,111 +196,48 @@ const handleDurationChange = async () => {
         }
       };
 
-      // FIXED: Update objectives with proper structure validation
+      // FIXED: Enhanced objective processing with proper structure validation
       if (refinedData.objectives && Array.isArray(refinedData.objectives)) {
-        console.log('🎯 Updating objectives:', refinedData.objectives.length, 'new objectives');
-        console.log('🔍 Raw objectives from API:', refinedData.objectives);
+        console.log('🎯 Processing new objectives:', refinedData.objectives.length);
 
-        // Enhanced objective processing with validation
-        updatedData.objectives = refinedData.objectives.map((obj, index) => {
-          console.log(`🎯 Processing objective ${index + 1}:`, obj);
+        // Process and validate each objective
+        const processedObjectives = [];
 
-          // Handle different possible structures from the backend
-          const processedObjective = {
-            bloom_level: obj.bloom_level || obj.level || 'understand',
-            objective: obj.objective || obj.description || `Learning objective ${index + 1}`,
-            action_verb: obj.action_verb || obj.verb || obj.action || 'understand',
-            content: obj.content || obj.topic || 'core concepts',
-            condition: obj.condition || null,
-            criteria: obj.criteria || null
-          };
+        for (let i = 0; i < refinedData.objectives.length; i++) {
+          const rawObj = refinedData.objectives[i];
+          console.log(`🔍 Processing objective ${i + 1}:`, rawObj);
 
-          console.log(`✅ Processed objective ${index + 1}:`, processedObjective);
-          return processedObjective;
-        });
-
-        console.log('✅ Final objectives structure:', updatedData.objectives);
-      } else {
-        console.log('⚠️ No objectives in refined data, keeping existing objectives');
-        // Keep existing objectives but ensure they have proper structure
-        updatedData.objectives = lessonData.objectives.map(obj => ({
-          bloom_level: obj.bloom_level || 'understand',
-          objective: obj.objective || 'Learning objective',
-          action_verb: obj.action_verb || 'understand',
-          content: obj.content || 'core concepts',
-          condition: obj.condition || null,
-          criteria: obj.criteria || null
-        }));
-      }
-
-      // Validate the final objectives structure
-      console.log('🔍 Final lesson data objectives:', updatedData.objectives);
-      console.log('🔍 Objectives count:', updatedData.objectives.length);
-      console.log('🔍 First objective sample:', updatedData.objectives[0]);
-
-      setLessonData(updatedData);
-      saveDraft(updatedData);
-      setShowDurationModal(false);
-      setNewDuration('');
-
-      toast.dismiss(loadingToast);
-
-      // Show comprehensive success message
-      const changesSummary = refinedData.duration_change_summary;
-      if (changesSummary && changesSummary.objectives_changed) {
-        toast.success(
-          `✅ Lesson updated to ${formatDuration(durationMinutes)}!\n` +
-          `📊 Objectives: ${changesSummary.old_objectives_count} → ${changesSummary.new_objectives_count}\n` +
-          `⏱️ All Gagne events recalculated`,
-          { duration: 6000 }
-        );
-      } else {
-        toast.success(`Lesson duration updated to ${formatDuration(durationMinutes)}!`);
-      }
-
-    } catch (error) {
-      toast.dismiss(loadingToast);
-      console.error('Duration change error:', error);
-      toast.error(`Failed to update duration: ${error.message}`);
-    }
-  };
-      const result = await refineContent(refinementRequest);
-
-      if (!result || !result.refined_content) {
-        throw new Error('No refined content received from API');
-      }
-
-      const refinedData = JSON.parse(result.refined_content);
-      console.log('📥 Refined data received:', refinedData);
-
-      // Update the entire lesson data with new duration, objectives, and events
-      const updatedData = {
-        ...lessonData,
-        lesson_info: {
-          ...lessonData.lesson_info,
-          duration_minutes: durationMinutes
-        },
-        total_duration: durationMinutes,
-        gagne_events: refinedData.gagne_events || lessonData.gagne_events,
-        lesson_plan: {
-          ...lessonData.lesson_plan,
-          overview: refinedData.overview || lessonData.lesson_plan.overview
+          const processedObjective = validateObjectiveStructure(rawObj, i + 1);
+          console.log(`✅ Processed objective ${i + 1}:`, processedObjective);
+          processedObjectives.push(processedObjective);
         }
+
+        updatedData.objectives = processedObjectives;
+        console.log('✅ Final processed objectives:', updatedData.objectives);
+
+      } else {
+        console.log('⚠️ No objectives in refined data or invalid format, keeping existing objectives');
+        // Keep existing objectives but ensure they have proper structure
+        updatedData.objectives = lessonData.objectives.map(validateObjectiveStructure);
+      }
+
+      // CRITICAL: Ensure lesson_info.selected_bloom_levels is properly maintained
+      const finalObjectives = updatedData.objectives;
+      const bloomLevelsFromObjectives = extractBloomLevelsFromObjectives(finalObjectives);
+
+      // Update the lesson_info with the current bloom levels from objectives
+      updatedData.lesson_info = {
+        ...updatedData.lesson_info,
+        selected_bloom_levels: bloomLevelsFromObjectives
       };
 
-      // Update objectives if they were recalculated
-      if (refinedData.objectives && Array.isArray(refinedData.objectives)) {
-        console.log('🎯 Updating objectives:', refinedData.objectives.length, 'new objectives');
-        updatedData.objectives = refinedData.objectives.map(obj => ({
-          bloom_level: obj.bloom_level,
-          objective: obj.objective,
-          action_verb: obj.action_verb || obj.verb,
-          content: obj.content,
-          condition: obj.condition,
-          criteria: obj.criteria
-        }));
-      }
+      console.log('🔍 Final validation:');
+      console.log('📊 Final objectives count:', updatedData.objectives.length);
+      console.log('🎯 Bloom levels in objectives:', bloomLevelsFromObjectives);
+      console.log('📋 Lesson info bloom levels:', updatedData.lesson_info.selected_bloom_levels);
+      console.log('🏷️ Sample objective structure:', updatedData.objectives[0]);
 
+      // Update state and storage
       setLessonData(updatedData);
       saveDraft(updatedData);
       setShowDurationModal(false);
@@ -326,14 +317,15 @@ const handleDurationChange = async () => {
         case 'objectives':
           if (Array.isArray(refinedData)) {
             console.log('🎯 Processing objectives refinement');
-            updatedData.objectives = refinedData.map(obj => ({
-              bloom_level: obj.bloom_level || obj.level,
-              objective: obj.objective,
-              action_verb: obj.action_verb || obj.verb,
-              content: obj.content,
-              condition: obj.condition,
-              criteria: obj.criteria
-            }));
+            updatedData.objectives = refinedData.map(validateObjectiveStructure);
+
+            // Update bloom levels in lesson_info
+            const bloomLevels = extractBloomLevelsFromObjectives(updatedData.objectives);
+            updatedData.lesson_info = {
+              ...updatedData.lesson_info,
+              selected_bloom_levels: bloomLevels
+            };
+
             updateSuccessful = true;
             console.log('✅ Updated objectives count:', updatedData.objectives.length);
           } else {
