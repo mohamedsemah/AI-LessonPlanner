@@ -336,7 +336,7 @@ export function formatGradeLevel(gradeLevel) {
 }
 
 /**
- * Clean overview text from template variables
+ * Clean overview text from template variables and sanitize HTML
  */
 export function cleanOverviewText(overview) {
   if (!overview) return "This lesson provides comprehensive coverage of the topic with engaging activities and assessments.";
@@ -350,6 +350,13 @@ export function cleanOverviewText(overview) {
     .replace(/GradeLevel\.SENIOR/g, 'senior')
     .replace(/GradeLevel\.POSTGRAD/g, 'postgraduate')
     .replace(/GradeLevel\./g, '');
+
+  // Basic HTML sanitization - allow common formatting tags but remove dangerous ones
+  cleanText = cleanText
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove script tags
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '') // Remove iframe tags
+    .replace(/on\w+="[^"]*"/gi, '') // Remove event handlers
+    .replace(/javascript:/gi, ''); // Remove javascript: urls
 
   return cleanText;
 }
