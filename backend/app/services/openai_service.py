@@ -929,6 +929,25 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
             }}
             """
 
+            # Add objective generation if needed
+            if objective_change_needed:
+                # Generate new objectives
+                new_objectives = await self._generate_objectives(mock_request)
+                objectives_json = json.dumps([{
+                    "bloom_level": obj.bloom_level.value,
+                    "objective": obj.objective,
+                    "action_verb": obj.action_verb,
+                    "content": obj.content,
+                    "condition": obj.condition,
+                    "criteria": obj.criteria
+                } for obj in new_objectives])
+
+                # Update the prompt to include the generated objectives
+                prompt = prompt.replace(
+                    f'"objectives": [{new_objectives_count} recalculated objectives with proper Bloom\'s distribution]',
+                    f'"objectives": {objectives_json}'
+                )
+
             response = await self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
