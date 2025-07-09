@@ -23,86 +23,93 @@ class PDFService:
     def _setup_custom_styles(self):
         """Setup custom styles for the PDF document"""
         # Title style
-        self.styles.add(ParagraphStyle(
-            name='CustomTitle',
-            parent=self.styles['Heading1'],
-            fontSize=24,
-            spaceAfter=30,
-            textColor=HexColor('#2563eb'),
-            alignment=TA_CENTER,
-            fontName='Helvetica-Bold'
-        ))
+        if 'CustomTitle' not in self.styles:
+            self.styles.add(ParagraphStyle(
+                name='CustomTitle',
+                parent=self.styles['Heading1'],
+                fontSize=24,
+                spaceAfter=30,
+                textColor=HexColor('#2563eb'),
+                alignment=TA_CENTER,
+                fontName='Helvetica-Bold'
+            ))
 
         # Subtitle style
-        self.styles.add(ParagraphStyle(
-            name='CustomSubtitle',
-            parent=self.styles['Heading2'],
-            fontSize=16,
-            spaceAfter=20,
-            textColor=HexColor('#374151'),
-            alignment=TA_CENTER,
-            fontName='Helvetica'
-        ))
+        if 'CustomSubtitle' not in self.styles:
+            self.styles.add(ParagraphStyle(
+                name='CustomSubtitle',
+                parent=self.styles['Heading2'],
+                fontSize=16,
+                spaceAfter=20,
+                textColor=HexColor('#374151'),
+                alignment=TA_CENTER,
+                fontName='Helvetica'
+            ))
 
         # Section heading style
-        self.styles.add(ParagraphStyle(
-            name='SectionHeading',
-            parent=self.styles['Heading2'],
-            fontSize=14,
-            spaceAfter=12,
-            spaceBefore=20,
-            textColor=HexColor('#1f2937'),
-            fontName='Helvetica-Bold',
-            leftIndent=0
-        ))
+        if 'SectionHeading' not in self.styles:
+            self.styles.add(ParagraphStyle(
+                name='SectionHeading',
+                parent=self.styles['Heading2'],
+                fontSize=14,
+                spaceAfter=12,
+                spaceBefore=20,
+                textColor=HexColor('#1f2937'),
+                fontName='Helvetica-Bold',
+                leftIndent=0
+            ))
 
         # Subsection heading style
-        self.styles.add(ParagraphStyle(
-            name='SubsectionHeading',
-            parent=self.styles['Heading3'],
-            fontSize=12,
-            spaceAfter=8,
-            spaceBefore=12,
-            textColor=HexColor('#374151'),
-            fontName='Helvetica-Bold',
-            leftIndent=20
-        ))
+        if 'SubsectionHeading' not in self.styles:
+            self.styles.add(ParagraphStyle(
+                name='SubsectionHeading',
+                parent=self.styles['Heading3'],
+                fontSize=12,
+                spaceAfter=8,
+                spaceBefore=12,
+                textColor=HexColor('#374151'),
+                fontName='Helvetica-Bold',
+                leftIndent=20
+            ))
 
-        # Body text style
-        self.styles.add(ParagraphStyle(
-            name='BodyText',
-            parent=self.styles['Normal'],
-            fontSize=11,
-            spaceAfter=6,
-            textColor=HexColor('#374151'),
-            fontName='Helvetica',
-            alignment=TA_JUSTIFY,
-            leftIndent=20
-        ))
+        # Custom Body text style (using different name to avoid conflict)
+        if 'CustomBodyText' not in self.styles:
+            self.styles.add(ParagraphStyle(
+                name='CustomBodyText',
+                parent=self.styles['Normal'],
+                fontSize=11,
+                spaceAfter=6,
+                textColor=HexColor('#374151'),
+                fontName='Helvetica',
+                alignment=TA_JUSTIFY,
+                leftIndent=20
+            ))
 
         # List item style
-        self.styles.add(ParagraphStyle(
-            name='ListItem',
-            parent=self.styles['Normal'],
-            fontSize=10,
-            spaceAfter=4,
-            textColor=HexColor('#4b5563'),
-            fontName='Helvetica',
-            leftIndent=40,
-            bulletIndent=30
-        ))
+        if 'ListItem' not in self.styles:
+            self.styles.add(ParagraphStyle(
+                name='ListItem',
+                parent=self.styles['Normal'],
+                fontSize=10,
+                spaceAfter=4,
+                textColor=HexColor('#4b5563'),
+                fontName='Helvetica',
+                leftIndent=40,
+                bulletIndent=30
+            ))
 
         # Objective style
-        self.styles.add(ParagraphStyle(
-            name='Objective',
-            parent=self.styles['Normal'],
-            fontSize=11,
-            spaceAfter=8,
-            textColor=HexColor('#1f2937'),
-            fontName='Helvetica',
-            leftIndent=30,
-            rightIndent=20
-        ))
+        if 'Objective' not in self.styles:
+            self.styles.add(ParagraphStyle(
+                name='Objective',
+                parent=self.styles['Normal'],
+                fontSize=11,
+                spaceAfter=8,
+                textColor=HexColor('#1f2937'),
+                fontName='Helvetica',
+                leftIndent=30,
+                rightIndent=20
+            ))
 
     def generate_pdf(self, request: PDFRequest) -> BinaryIO:
         """Generate a formatted PDF from lesson data"""
@@ -193,7 +200,7 @@ class PDFService:
         based on Bloom's Taxonomy and Gagne's Nine Events of Instruction. Please review 
         and adapt as needed for your specific teaching context and student needs.
         """
-        story.append(Paragraph(disclaimer, self.styles['BodyText']))
+        story.append(Paragraph(disclaimer, self.styles['CustomBodyText']))
 
         return story
 
@@ -244,18 +251,18 @@ class PDFService:
         <b>Date Created:</b> {datetime.now().strftime('%B %d, %Y')}
         """
 
-        story.append(Paragraph(overview_text, self.styles['BodyText']))
+        story.append(Paragraph(overview_text, self.styles['CustomBodyText']))
         story.append(Spacer(1, 15))
 
         # Preliminary objectives
         story.append(Paragraph("Preliminary Learning Goals", self.styles['SubsectionHeading']))
-        story.append(Paragraph(info['preliminary_objectives'], self.styles['BodyText']))
+        story.append(Paragraph(info['preliminary_objectives'], self.styles['CustomBodyText']))
         story.append(Spacer(1, 15))
 
         # Selected Bloom's levels
         bloom_levels = [level.title() for level in info['selected_bloom_levels']]
         story.append(Paragraph("Selected Bloom's Taxonomy Levels", self.styles['SubsectionHeading']))
-        story.append(Paragraph(', '.join(bloom_levels), self.styles['BodyText']))
+        story.append(Paragraph(', '.join(bloom_levels), self.styles['CustomBodyText']))
 
         story.append(Spacer(1, 20))
         return story
@@ -300,7 +307,7 @@ class PDFService:
 
         # Overview
         story.append(Paragraph("Lesson Overview", self.styles['SubsectionHeading']))
-        story.append(Paragraph(plan.overview, self.styles['BodyText']))
+        story.append(Paragraph(plan.overview, self.styles['CustomBodyText']))
         story.append(Spacer(1, 10))
 
         # Prerequisites
@@ -352,25 +359,25 @@ class PDFService:
             story.append(Paragraph(event_title, self.styles['SubsectionHeading']))
 
             # Description
-            story.append(Paragraph(f"<b>Purpose:</b> {event.description}", self.styles['BodyText']))
-            story.append(Paragraph(f"<b>Duration:</b> {event.duration_minutes} minutes", self.styles['BodyText']))
+            story.append(Paragraph(f"<b>Purpose:</b> {event.description}", self.styles['CustomBodyText']))
+            story.append(Paragraph(f"<b>Duration:</b> {event.duration_minutes} minutes", self.styles['CustomBodyText']))
 
             # Activities
             if event.activities:
-                story.append(Paragraph("<b>Activities:</b>", self.styles['BodyText']))
+                story.append(Paragraph("<b>Activities:</b>", self.styles['CustomBodyText']))
                 for activity in event.activities:
                     story.append(Paragraph(f"• {activity}", self.styles['ListItem']))
 
             # Materials
             if event.materials_needed:
-                story.append(Paragraph("<b>Materials Needed:</b>", self.styles['BodyText']))
+                story.append(Paragraph("<b>Materials Needed:</b>", self.styles['CustomBodyText']))
                 for material in event.materials_needed:
                     story.append(Paragraph(f"• {material}", self.styles['ListItem']))
 
             # Assessment strategy
             if event.assessment_strategy:
                 story.append(
-                    Paragraph(f"<b>Assessment Strategy:</b> {event.assessment_strategy}", self.styles['BodyText']))
+                    Paragraph(f"<b>Assessment Strategy:</b> {event.assessment_strategy}", self.styles['CustomBodyText']))
 
             story.append(Spacer(1, 15))
 

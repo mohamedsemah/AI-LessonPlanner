@@ -198,3 +198,163 @@
     @apply bg-purple-100 text-purple-800 border-purple-200;
   }
 }
+/* Add this to your existing frontend/src/styles/globals.css file */
+
+/* Custom scrollbar for PDF preview */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(156 163 175) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgb(156 163 175);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(107 114 128);
+}
+
+.custom-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* PDF Preview specific scrolling */
+.pdf-preview-scroll-area {
+  scroll-behavior: smooth;
+}
+
+.pdf-preview-scroll-area::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.pdf-preview-scroll-area::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+}
+
+.pdf-preview-scroll-area::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, rgb(156 163 175), rgb(107 114 128));
+  border-radius: 6px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.pdf-preview-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, rgb(107 114 128), rgb(75 85 99));
+}
+
+/* Prevent text selection during page transitions */
+.pdf-preview-scroll-area {
+  user-select: none;
+}
+
+/* Re-enable text selection for content */
+.pdf-preview-scroll-area .page-content {
+  user-select: text;
+}
+
+/* PDF page shadow and transitions */
+.pdf-page-shadow {
+  box-shadow: 0 10px 40px -12px rgba(0, 0, 0, 0.25);
+}
+
+/* Ensure modal content doesn't interfere with scrolling */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+
+/* Grid pattern for backgrounds */
+.bg-grid-pattern {
+  background-image:
+    linear-gradient(to right, rgba(59, 130, 246, 0.1) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(59, 130, 246, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* PDF Preview specific styles */
+.pdf-preview-viewport {
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+}
+
+/* Page content wrapper for better scrolling */
+.page-content {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Improve page rendering at different zoom levels */
+.pdf-page {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* Page transition animations */
+.page-transition-enter {
+  opacity: 0;
+  transform: translateX(30px);
+}
+
+.page-transition-enter-active {
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 300ms ease-out, transform 300ms ease-out;
+}
+
+.page-transition-exit {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.page-transition-exit-active {
+  opacity: 0;
+  transform: translateX(-30px);
+  transition: opacity 300ms ease-out, transform 300ms ease-out;
+}
+
+/* Custom checkbox styling for export options */
+input[type="checkbox"]:checked {
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+}
+
+input[type="checkbox"]:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Bloom's level colors that work with Tailwind purging */
+.bloom-red { @apply bg-red-100 text-red-800 border-red-200; }
+.bloom-orange { @apply bg-orange-100 text-orange-800 border-orange-200; }
+.bloom-yellow { @apply bg-yellow-100 text-yellow-800 border-yellow-200; }
+.bloom-green { @apply bg-green-100 text-green-800 border-green-200; }
+.bloom-blue { @apply bg-blue-100 text-blue-800 border-blue-200; }
+.bloom-purple { @apply bg-purple-100 text-purple-800 border-purple-200; }
+
+/* Print-friendly styles */
+@media print {
+  .pdf-preview-container {
+    background: white !important;
+    box-shadow: none !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
