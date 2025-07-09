@@ -15,6 +15,7 @@ import LearningObjectivesSection from '../components/results/LearningObjectivesS
 import GagneEventsSection from '../components/results/GagneEventsSection';
 import SidebarSection from '../components/results/SidebarSection';
 import WYSIWYGEditingModals from '../components/results/WYSIWYGEditingModals';
+import PDFPreview from '../components/lesson/PDFPreview';
 
 const Results = () => {
   const location = useLocation();
@@ -40,18 +41,24 @@ const Results = () => {
 
   if (!lessonData) return null;
 
-  const handleExportPDF = async () => {
+  const handleExportPDF = async (lessonDataToExport = lessonData, options = {}) => {
     try {
-      const pdfBlob = await exportToPDF(lessonData, {
-        includeCoverPage: true,
-        includeAppendices: true
+      const pdfBlob = await exportToPDF(lessonDataToExport, {
+        includeCoverPage: options.includeCoverPage ?? true,
+        includeAppendices: options.includeAppendices ?? true,
+        includeTableOfContents: options.includeTableOfContents ?? true
       });
-      const filename = generatePDFFilename(lessonData);
+      const filename = generatePDFFilename(lessonDataToExport);
       downloadFile(pdfBlob, filename);
       toast.success(TOAST_MESSAGES.SUCCESS.PDF_EXPORTED);
     } catch (error) {
+      console.error('PDF Export Error:', error);
       toast.error(TOAST_MESSAGES.ERROR.EXPORT_FAILED);
     }
+  };
+
+  const handlePreviewPDF = () => {
+    setShowPDFPreview(true);
   };
 
   const commonProps = {
@@ -89,11 +96,15 @@ const Results = () => {
               <ArrowLeft className="w-4 h-4" />
               Create New
             </Button>
-            <Button variant="outline" onClick={() => setShowPDFPreview(true)} className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={handlePreviewPDF}
+              className="flex items-center gap-2"
+            >
               <Eye className="w-4 h-4" />
               Preview
             </Button>
-            <Button onClick={handleExportPDF} loading={loading} className="flex items-center gap-2">
+            <Button onClick={() => handleExportPDF()} loading={loading} className="flex items-center gap-2">
               <Download className="w-4 h-4" />
               Export PDF
             </Button>
@@ -111,6 +122,7 @@ const Results = () => {
           </div>
         </div>
 
+        {/* WYSIWYG Editing Modals */}
         <WYSIWYGEditingModals
           {...commonProps}
           showDurationModal={showDurationModal}
@@ -119,6 +131,14 @@ const Results = () => {
           setNewDuration={setNewDuration}
           showRedistributionInfo={showRedistributionInfo}
           setShowRedistributionInfo={setShowRedistributionInfo}
+        />
+
+        {/* PDF Preview Modal */}
+        <PDFPreview
+          lessonData={lessonData}
+          isOpen={showPDFPreview}
+          onClose={() => setShowPDFPreview(false)}
+          onExport={handleExportPDF}
         />
       </div>
     </div>
