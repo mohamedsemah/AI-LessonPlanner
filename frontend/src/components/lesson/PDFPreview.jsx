@@ -30,6 +30,7 @@ import {
 
 const PDFPreview = ({ lessonData, isOpen, onClose, onExport }) => {
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageInputValue, setPageInputValue] = useState('1');
   const [zoomLevel, setZoomLevel] = useState(85);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
@@ -43,7 +44,10 @@ const PDFPreview = ({ lessonData, isOpen, onClose, onExport }) => {
 
   // Calculate total pages based on export options
   const calculateTotalPages = () => {
-    let pages = 1; // Cover page (always included for preview)
+    let pages = 0;
+
+    // Cover page (conditional based on export options)
+    if (exportOptions.includeCoverPage) pages += 1;
 
     if (exportOptions.includeTableOfContents) pages += 1; // TOC
     pages += 1; // Overview
@@ -61,6 +65,27 @@ const PDFPreview = ({ lessonData, isOpen, onClose, onExport }) => {
   };
 
   const totalPages = calculateTotalPages();
+
+  // Handle page adjustment when export options change
+  useEffect(() => {
+    const newTotalPages = calculateTotalPages();
+
+    // If current page exceeds new total pages, go to last page
+    if (currentPage > newTotalPages) {
+      setCurrentPage(newTotalPages);
+      setPageInputValue(newTotalPages.toString());
+    }
+
+    // If we're on page 1 and cover page gets disabled, stay on page 1 (which will now be different content)
+    // If cover page gets enabled and we're on page 1, stay on page 1 (which will now be the cover page)
+    // This provides smooth transitions
+
+  }, [exportOptions.includeCoverPage, exportOptions.includeTableOfContents, exportOptions.includeAppendices]);
+
+  // Sync input value when currentPage changes (from navigation buttons, thumbnails, etc.)
+  useEffect(() => {
+    setPageInputValue(currentPage.toString());
+  }, [currentPage]);
 
   const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 15, 150));
   const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 15, 50));
@@ -116,11 +141,13 @@ const PDFPreview = ({ lessonData, isOpen, onClose, onExport }) => {
   const renderPage = () => {
     let pageIndex = 1;
 
-    // Cover Page (always shown in preview)
-    if (currentPage === pageIndex) {
-      return <CoverPage lessonData={lessonData} currentDate={currentDate} />;
+    // Cover Page (conditional based on export options)
+    if (exportOptions.includeCoverPage) {
+      if (currentPage === pageIndex) {
+        return <CoverPage lessonData={lessonData} currentDate={currentDate} />;
+      }
+      pageIndex++;
     }
-    pageIndex++;
 
     // Table of Contents
     if (exportOptions.includeTableOfContents && currentPage === pageIndex) {
@@ -184,8 +211,10 @@ const PDFPreview = ({ lessonData, isOpen, onClose, onExport }) => {
   const getPageTitle = () => {
     let pageIndex = 1;
 
-    if (currentPage === pageIndex) return 'Cover Page';
-    pageIndex++;
+    if (exportOptions.includeCoverPage) {
+      if (currentPage === pageIndex) return 'Cover Page';
+      pageIndex++;
+    }
 
     if (exportOptions.includeTableOfContents && currentPage === pageIndex) return 'Table of Contents';
     if (exportOptions.includeTableOfContents) pageIndex++;
@@ -338,17 +367,35 @@ const PDFPreview = ({ lessonData, isOpen, onClose, onExport }) => {
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-500">Go to:</span>
                 <input
-                  type="number"
-                  min="1"
-                  max={totalPages}
-                  value={currentPage}
-                  onChange={(e) => {
-                    const page = parseInt(e.target.value);
+                  type="text"
+                  value={pageInputValue}
+                  onChange={(e) => setPageInputValue(e.target.value)}
+                  onBlur={() => {
+                    const page = parseInt(pageInputValue);
                     if (page >= 1 && page <= totalPages) {
                       setCurrentPage(page);
+                    } else {
+                      // Reset to current page if invalid
+                      setPageInputValue(currentPage.toString());
                     }
                   }}
-                  className="w-16 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const page = parseInt(pageInputValue);
+                      if (page >= 1 && page <= totalPages) {
+                        setCurrentPage(page);
+                      } else {
+                        setPageInputValue(currentPage.toString());
+                      }
+                      e.target.blur();
+                    }
+                    if (e.key === 'Escape') {
+                      setPageInputValue(currentPage.toString());
+                      e.target.blur();
+                    }
+                  }}
+                  className="w-16 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
+                  placeholder={totalPages.toString()}
                 />
               </div>
             </div>
@@ -395,14 +442,23 @@ const PDFPreview = ({ lessonData, isOpen, onClose, onExport }) => {
                 {Array.from({ length: totalPages }, (_, i) => {
                   const pageNum = i + 1;
                   let pageTitle = 'Page';
+                  let pageIndex = 1;
 
-                  // Determine page title
-                  if (pageNum === 1) pageTitle = 'Cover';
-                  else if (exportOptions.includeTableOfContents && pageNum === 2) pageTitle = 'Contents';
-                  else if ((exportOptions.includeTableOfContents && pageNum === 3) || (!exportOptions.includeTableOfContents && pageNum === 2)) pageTitle = 'Overview';
-                  else if ((exportOptions.includeTableOfContents && pageNum === 4) || (!exportOptions.includeTableOfContents && pageNum === 3)) pageTitle = 'Objectives';
-                  else if ((exportOptions.includeTableOfContents && pageNum === 5) || (!exportOptions.includeTableOfContents && pageNum === 4)) pageTitle = 'Plan';
-                  else if (pageNum >= (exportOptions.includeTableOfContents ? 6 : 5) && pageNum < totalPages - (exportOptions.includeAppendices ? 1 : -1)) pageTitle = 'Events';
+                  // Determine page title based on current export options
+                  if (exportOptions.includeCoverPage) {
+                    if (pageNum === pageIndex) pageTitle = 'Cover';
+                    pageIndex++;
+                  }
+
+                  if (exportOptions.includeTableOfContents) {
+                    if (pageNum === pageIndex) pageTitle = 'Contents';
+                    pageIndex++;
+                  }
+
+                  if (pageNum === pageIndex) pageTitle = 'Overview';
+                  else if (pageNum === pageIndex + 1) pageTitle = 'Objectives';
+                  else if (pageNum === pageIndex + 2) pageTitle = 'Plan';
+                  else if (pageNum >= pageIndex + 3 && pageNum < totalPages - (exportOptions.includeAppendices ? 1 : -1)) pageTitle = 'Events';
                   else if (exportOptions.includeAppendices && pageNum >= totalPages - 1) pageTitle = pageNum === totalPages - 1 ? 'Bloom' : 'Gagne';
 
                   return (
@@ -425,28 +481,7 @@ const PDFPreview = ({ lessonData, isOpen, onClose, onExport }) => {
               </div>
             </div>
 
-            {/* Keyboard Shortcuts */}
-            <div className="space-y-2 pt-4 border-t border-gray-200">
-              <h3 className="text-sm font-medium text-gray-900">Shortcuts</h3>
-              <div className="text-xs text-gray-500 space-y-1">
-                <div className="flex justify-between">
-                  <span>← →</span>
-                  <span>Navigate</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>+ -</span>
-                  <span>Zoom</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>0</span>
-                  <span>Reset Zoom</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Esc</span>
-                  <span>Close</span>
-                </div>
-              </div>
-            </div>
+
           </div>
 
           {/* Preview Area */}
@@ -460,14 +495,14 @@ const PDFPreview = ({ lessonData, isOpen, onClose, onExport }) => {
                     transform: `scale(${zoomLevel / 100})`,
                     transformOrigin: 'top center',
                     width: '210mm',
-                    height: 'auto', // Allow content to determine height
+                    height: 'auto',
                     maxWidth: '210mm',
-                    minHeight: `${297 * (zoomLevel / 100)}mm` // Scale min-height with zoom
+                    minHeight: `${297 * (zoomLevel / 100)}mm`
                   }}
                 >
                   <AnimatePresence mode="wait">
                     <motion.div
-                      key={currentPage}
+                      key={`${currentPage}-${exportOptions.includeCoverPage}-${exportOptions.includeTableOfContents}-${exportOptions.includeAppendices}`}
                       initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -20 }}
