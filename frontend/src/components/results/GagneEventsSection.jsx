@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Edit3, BookOpen, Info } from 'lucide-react';
+import { Edit3, BookOpen, Info, Eye } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import Button from '../ui/Button';
 import Badge from '../ui/Badge';
 import { formatDuration } from '../../utils/helpers';
+import LearningObjectivesSlideModal from '../lesson/LearningObjectivesSlideModal';
 
 const GagneEventsSection = ({
   lessonData,
@@ -15,6 +16,8 @@ const GagneEventsSection = ({
   lastRedistribution,
   setShowRedistributionInfo
 }) => {
+  const [showSlidePreview, setShowSlidePreview] = useState(false);
+
   const handleEditSection = (sectionType, content) => {
     if (sectionType === 'gagne_events') {
       setOriginalGagneEvents([...content]);
@@ -61,9 +64,23 @@ const GagneEventsSection = ({
                     <h4 className="font-semibold text-gray-900">
                       Event {event.event_number}: {event.event_name}
                     </h4>
-                    <Badge variant="default" size="sm">
-                      {formatDuration(event.duration_minutes)}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {/* Add Preview Slide button for Event 2 (Inform Learners of Objectives) */}
+                      {event.event_number === 2 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowSlidePreview(true)}
+                          className="flex items-center gap-2"
+                        >
+                          <Eye className="w-4 h-4" />
+                          Preview Slide
+                        </Button>
+                      )}
+                      <Badge variant="default" size="sm">
+                        {formatDuration(event.duration_minutes)}
+                      </Badge>
+                    </div>
                   </div>
                   <p className="text-gray-600 text-sm mb-3">{event.description}</p>
 
@@ -106,6 +123,13 @@ const GagneEventsSection = ({
           </div>
         </CardContent>
       </Card>
+
+      {/* Learning Objectives Slide Preview Modal */}
+      <LearningObjectivesSlideModal
+        isOpen={showSlidePreview}
+        onClose={() => setShowSlidePreview(false)}
+        lessonData={lessonData}
+      />
     </motion.div>
   );
 };
