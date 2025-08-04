@@ -7,267 +7,209 @@ import traceback
 
 from ..models.udl_content import CourseContentRequest, CourseContentResponse, ContentRefinementRequest
 from ..services.udl_content_service import UDLContentService
+from ..services.export_service import ExportService
 
 # Set up logging
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/udl-content", tags=["udl-content"])
+router = APIRouter(prefix="/api/udl-content", tags=["UDL Content"])
 
 
 # Dependency injection
 def get_udl_content_service() -> UDLContentService:
+    """Dependency to get UDL content service"""
+    logger.info("Creating UDLContentService dependency...")
     try:
-        logger.info("Creating UDLContentService dependency...")
         service = UDLContentService()
-        logger.info("UDLContentService dependency created successfully")
+        logger.info("UDLContentService initialized successfully")
         return service
     except Exception as e:
-        logger.error(f"Failed to create UDLContentService dependency: {str(e)}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Service initialization failed: {str(e)}")
+        logger.error(f"Failed to initialize UDLContentService: {e}")
+        raise HTTPException(status_code=500, detail="Service initialization failed")
+
+def get_export_service() -> ExportService:
+    """Dependency to get export service"""
+    try:
+        return ExportService()
+    except Exception as e:
+        logger.error(f"Failed to initialize ExportService: {e}")
+        raise HTTPException(status_code=500, detail="Export service initialization failed")
 
 
-@router.post("/generate", response_model=CourseContentResponse)
+@router.post("/generate")
 async def generate_course_content(
     request: CourseContentRequest,
     udl_service: UDLContentService = Depends(get_udl_content_service)
 ) -> CourseContentResponse:
-    """Generate multimodal course content based on lesson plan with UDL compliance"""
+    """Generate UDL-compliant course content based on lesson plan"""
+    logger.info("=== UDL CONTENT GENERATION START ===")
     try:
-        logger.info("=== UDL CONTENT GENERATION START ===")
         logger.info("Received course content generation request")
-        logger.info(f"Request data: lesson_data keys: {list(request.lesson_data.keys()) if request.lesson_data else 'None'}")
+        logger.info(f"Request data: lesson_data keys: {list(request.lesson_data.keys())}")
         
-        # Log the request structure for debugging
-        if request.lesson_data:
-            lesson_info = request.lesson_data.get("lesson_info", {})
-            objectives = request.lesson_data.get("objectives", [])
-            gagne_events = request.lesson_data.get("gagne_events", [])
-            
-            logger.info(f"Lesson info: {lesson_info.get('course_title', 'Unknown')}")
-            logger.info(f"Objectives count: {len(objectives)}")
-            logger.info(f"Gagne events count: {len(gagne_events)}")
+        lesson_info = request.lesson_data.get("lesson_info", {})
+        logger.info(f"Lesson info: {lesson_info.get('lesson_topic', 'Unknown')}")
+        
+        objectives = request.lesson_data.get("objectives", [])
+        logger.info(f"Objectives count: {len(objectives)}")
+        
+        gagne_events = request.lesson_data.get("gagne_events", [])
+        logger.info(f"Gagne events count: {len(gagne_events)}")
         
         logger.info("Calling UDL service generate_course_content...")
-        course_content = await udl_service.generate_course_content(request)
+        result = await udl_service.generate_course_content(request)
         logger.info("UDL service returned successfully")
+        
         logger.info("Course content generation completed successfully")
         logger.info("=== UDL CONTENT GENERATION END ===")
-        return course_content
+        
+        return result
     except Exception as e:
-        logger.error("=== UDL CONTENT GENERATION ERROR ===")
-        logger.error(f"Failed to generate course content: {str(e)}")
-        logger.error(f"Error type: {type(e).__name__}")
-        logger.error(f"Error args: {e.args}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        logger.error("=== UDL CONTENT GENERATION ERROR END ===")
-        
-        # Return a more detailed error message
-        error_detail = f"Failed to generate course content: {str(e)}"
+        logger.error(f"Error in generate_course_content: {str(e)}")
         if hasattr(e, '__traceback__'):
-            error_detail += f"\nTraceback: {traceback.format_exc()}"
-        
-        raise HTTPException(status_code=500, detail=error_detail)
-
+            logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate course content: {str(e)}")
 
 @router.post("/refine")
 async def refine_content(
     request: ContentRefinementRequest,
     udl_service: UDLContentService = Depends(get_udl_content_service)
 ) -> Dict[str, Any]:
-    """Refine specific slide content based on UDL principles"""
+    """Refine specific slide content"""
     try:
-        logger.info(f"Received content refinement request for slide {request.slide_id}")
-        refined_content = await udl_service.refine_content(request.dict())
-        logger.info("Content refinement completed successfully")
-        return refined_content
+        result = await udl_service.refine_content(request)
+        return result
     except Exception as e:
-        logger.error(f"Failed to refine content: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to refine content: {str(e)}")
 
-
-@router.get("/udl-guidelines")
+@router.get("/guidelines")
 async def get_udl_guidelines() -> Dict[str, Any]:
-    """Get UDL guidelines and implementation strategies"""
-    udl_guidelines = {
-        "representation": {
-            "name": "Provide Multiple Means of Representation",
-            "guidelines": {
-                "perception": {
-                    "name": "Perception",
-                    "description": "Offer ways of customizing the display of information",
-                    "strategies": [
-                        "Provide alternatives for auditory information",
-                        "Provide alternatives for visual information",
-                        "Customize the display of information"
-                    ]
-                },
-                "language": {
-                    "name": "Language & Symbols",
-                    "description": "Clarify vocabulary, syntax, and structure",
-                    "strategies": [
-                        "Clarify vocabulary and symbols",
-                        "Clarify syntax and structure",
-                        "Support decoding of text and mathematical notation",
-                        "Promote understanding across languages"
-                    ]
-                },
-                "comprehension": {
-                    "name": "Comprehension",
-                    "description": "Help learners make sense of information",
-                    "strategies": [
-                        "Activate or supply background knowledge",
-                        "Highlight patterns, critical features, big ideas, and relationships",
-                        "Guide information processing and visualization",
-                        "Maximize transfer and generalization"
-                    ]
-                }
-            }
-        },
-        "action_expression": {
-            "name": "Provide Multiple Means of Action & Expression",
-            "guidelines": {
-                "physical_action": {
-                    "name": "Physical Action",
-                    "description": "Vary the methods for response and navigation",
-                    "strategies": [
-                        "Vary the methods for response and navigation",
-                        "Optimize access to tools and assistive technologies"
-                    ]
-                },
-                "expression": {
-                    "name": "Expression & Communication",
-                    "description": "Use multiple media for communication",
-                    "strategies": [
-                        "Use multiple media for communication",
-                        "Build fluencies with graduated levels of support",
-                        "Practice with graduated levels of support"
-                    ]
-                },
-                "executive_functions": {
-                    "name": "Executive Functions",
-                    "description": "Guide appropriate goal-setting and strategy development",
-                    "strategies": [
-                        "Guide appropriate goal-setting",
-                        "Support planning and strategy development",
-                        "Facilitate managing information and resources",
-                        "Enhance capacity for monitoring progress"
-                    ]
-                }
-            }
-        },
-        "engagement": {
-            "name": "Provide Multiple Means of Engagement",
-            "guidelines": {
-                "recruiting_interest": {
-                    "name": "Recruiting Interest",
-                    "description": "Optimize individual choice and autonomy",
-                    "strategies": [
-                        "Optimize individual choice and autonomy",
-                        "Optimize relevance, value, and authenticity",
-                        "Minimize threats and distractions"
-                    ]
-                },
-                "sustaining_effort": {
-                    "name": "Sustaining Effort & Persistence",
-                    "description": "Help learners maintain effort and motivation",
-                    "strategies": [
-                        "Heighten salience of goals and objectives",
-                        "Vary demands and resources to optimize challenge",
-                        "Foster collaboration and community",
-                        "Increase mastery-oriented feedback"
-                    ]
-                },
-                "self_regulation": {
-                    "name": "Self-Regulation",
-                    "description": "Help learners develop self-assessment and reflection",
-                    "strategies": [
-                        "Guide personal goal-setting and expectations",
-                        "Scaffold coping skills and strategies",
-                        "Develop self-assessment and reflection"
-                    ]
-                }
-            }
-        }
-    }
-    return {"udl_guidelines": udl_guidelines}
+    """Get UDL guidelines and principles"""
+    try:
+        service = UDLContentService()
+        return service.get_udl_guidelines()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get UDL guidelines: {str(e)}")
 
-
-@router.get("/content-modalities")
+@router.get("/modalities")
 async def get_content_modalities() -> Dict[str, Any]:
-    """Get available content modalities for multimodal learning"""
-    modalities = {
-        "visual": {
-            "name": "Visual",
-            "description": "Content that can be seen and processed visually",
-            "examples": ["Images", "Diagrams", "Charts", "Videos", "Animations"],
-            "accessibility_features": ["Alt text", "High contrast", "Large fonts", "Color coding"]
-        },
-        "auditory": {
-            "name": "Auditory",
-            "description": "Content that can be heard and processed aurally",
-            "examples": ["Audio narration", "Podcasts", "Music", "Sound effects"],
-            "accessibility_features": ["Transcripts", "Captions", "Audio descriptions", "Volume control"]
-        },
-        "textual": {
-            "name": "Textual",
-            "description": "Written content that can be read",
-            "examples": ["Text", "Documents", "Articles", "Notes"],
-            "accessibility_features": ["Screen readers", "Text-to-speech", "Font size adjustment", "Line spacing"]
-        },
-        "kinesthetic": {
-            "name": "Kinesthetic",
-            "description": "Content that involves physical movement and interaction",
-            "examples": ["Hands-on activities", "Simulations", "Interactive exercises"],
-            "accessibility_features": ["Alternative input methods", "Assistive technologies", "Physical accommodations"]
-        },
-        "interactive": {
-            "name": "Interactive",
-            "description": "Content that responds to user input and engagement",
-            "examples": ["Quizzes", "Games", "Simulations", "Virtual labs"],
-            "accessibility_features": ["Keyboard navigation", "Voice control", "Alternative input devices"]
-        }
-    }
-    return {"content_modalities": modalities}
+    """Get available content modalities"""
+    try:
+        service = UDLContentService()
+        return service.get_content_modalities()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get content modalities: {str(e)}")
 
-
-@router.get("/accessibility-features")
+@router.get("/accessibility")
 async def get_accessibility_features() -> Dict[str, Any]:
-    """Get available accessibility features for course content"""
-    features = {
-        "visual_accessibility": [
-            "Alt text for images",
-            "High contrast mode",
-            "Large font options",
-            "Color-blind friendly palettes",
-            "Screen reader compatibility"
-        ],
-        "auditory_accessibility": [
-            "Closed captions",
-            "Audio transcripts",
-            "Audio descriptions",
-            "Volume controls",
-            "Background noise reduction"
-        ],
-        "cognitive_accessibility": [
-            "Clear navigation",
-            "Consistent layout",
-            "Simple language",
-            "Step-by-step instructions",
-            "Progress indicators"
-        ],
-        "physical_accessibility": [
-            "Keyboard navigation",
-            "Voice control support",
-            "Alternative input devices",
-            "Adjustable timing",
-            "Physical accommodation options"
-        ]
-    }
-    return {"accessibility_features": features}
+    """Get available accessibility features"""
+    try:
+        service = UDLContentService()
+        return service.get_accessibility_features()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get accessibility features: {str(e)}")
 
+@router.post("/export/pptx")
+async def export_powerpoint(
+    request: Dict[str, Any],
+    export_service: ExportService = Depends(get_export_service)
+):
+    """Export course content to PowerPoint format"""
+    try:
+        logger.info("Starting PowerPoint export")
+        
+        # Extract course content data
+        course_content = request.get("course_content")
+        lesson_data = request.get("lesson_data", {})
+        
+        if not course_content:
+            raise HTTPException(status_code=400, detail="Course content is required")
+        
+        # Generate PowerPoint file
+        pptx_buffer = await export_service.export_to_powerpoint(course_content, lesson_data)
+        
+        # Generate filename
+        lesson_info = lesson_data.get("lesson_info", {})
+        filename = f"{lesson_info.get('course_title', 'Course')}_{lesson_info.get('lesson_topic', 'Lesson')}.pptx"
+        filename = filename.replace(" ", "_").replace("/", "_")
+        
+        logger.info(f"PowerPoint export completed: {filename}")
+        
+        return StreamingResponse(
+            io.BytesIO(pptx_buffer.getvalue()),
+            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        logger.error(f"PowerPoint export error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to export PowerPoint: {str(e)}")
 
-@router.get("/health")
-async def health_check() -> Dict[str, str]:
-    """Health check endpoint for UDL content service"""
-    return {"status": "healthy", "service": "udl-content-service"} 
+@router.post("/export/pdf")
+async def export_pdf(
+    request: Dict[str, Any],
+    export_service: ExportService = Depends(get_export_service)
+):
+    """Export course content to PDF format"""
+    try:
+        logger.info("Starting PDF export")
+        
+        # Extract course content data
+        course_content = request.get("course_content")
+        lesson_data = request.get("lesson_data", {})
+        
+        if not course_content:
+            raise HTTPException(status_code=400, detail="Course content is required")
+        
+        # Generate PDF file
+        pdf_buffer = await export_service.export_to_pdf(course_content, lesson_data)
+        
+        # Generate filename
+        lesson_info = lesson_data.get("lesson_info", {})
+        filename = f"{lesson_info.get('course_title', 'Course')}_{lesson_info.get('lesson_topic', 'Lesson')}.pdf"
+        filename = filename.replace(" ", "_").replace("/", "_")
+        
+        logger.info(f"PDF export completed: {filename}")
+        
+        return StreamingResponse(
+            io.BytesIO(pdf_buffer.getvalue()),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        logger.error(f"PDF export error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to export PDF: {str(e)}")
+
+@router.post("/export/html")
+async def export_html(
+    request: Dict[str, Any],
+    export_service: ExportService = Depends(get_export_service)
+):
+    """Export course content to premium HTML format"""
+    try:
+        logger.info("Starting HTML export")
+        
+        # Extract course content data
+        course_content = request.get("course_content")
+        lesson_data = request.get("lesson_data", {})
+        
+        if not course_content:
+            raise HTTPException(status_code=400, detail="Course content is required")
+        
+        # Generate HTML content
+        html_content = export_service.export_to_html(course_content, lesson_data)
+        
+        # Generate filename
+        lesson_info = lesson_data.get("lesson_info", {})
+        filename = f"{lesson_info.get('course_title', 'Course')}_{lesson_info.get('lesson_topic', 'Lesson')}.html"
+        filename = filename.replace(" ", "_").replace("/", "_")
+        
+        logger.info(f"HTML export completed: {filename}")
+        
+        return StreamingResponse(
+            io.StringIO(html_content),
+            media_type="text/html",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        logger.error(f"HTML export error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to export HTML: {str(e)}") 

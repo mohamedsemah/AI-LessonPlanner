@@ -96,22 +96,22 @@ async def test_slide_content():
         for i, slide in enumerate(result.slides, 1):
             print(f"\n📊 SLIDE {i}: {slide.title}")
             print("-" * 50)
-            print(f"Content Type: {slide.content_type}")
+            print(f"Content Modality: {slide.content_modality}")
             print(f"Duration: {slide.duration_minutes} minutes")
             print(f"UDL Guidelines: {', '.join(slide.udl_guidelines)}")
             print(f"Accessibility Features: {', '.join(slide.accessibility_features)}")
             print(f"Visual Elements: {', '.join([str(e) for e in slide.visual_elements])}")
             
             print("\n📝 MAIN CONTENT:")
-            print(slide.main_content)
+            print(slide.content)
             
             if slide.audio_script:
                 print(f"\n🎤 AUDIO SCRIPT:")
                 print(slide.audio_script[:200] + "..." if len(slide.audio_script) > 200 else slide.audio_script)
             
-            if slide.notes:
+            if slide.speaker_notes:
                 print(f"\n📋 SPEAKER NOTES:")
-                print(slide.notes)
+                print(slide.speaker_notes)
             
             print("\n" + "="*80)
         
