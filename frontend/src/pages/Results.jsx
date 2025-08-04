@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Download, ArrowLeft, Eye } from 'lucide-react';
+import { Download, ArrowLeft, Eye, Presentation } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import Button from '../components/ui/Button';
@@ -77,6 +77,10 @@ const Results = () => {
     setShowPDFPreview(true);
   };
 
+  const handleGenerateCourseContent = () => {
+    navigate('/course-content', { state: { lessonData } });
+  };
+
   const commonProps = {
     lessonData,
     setLessonData,
@@ -119,6 +123,14 @@ const Results = () => {
             >
               <Eye className="w-4 h-4" />
               Preview
+            </Button>
+            <Button 
+              variant="outline"
+              onClick={handleGenerateCourseContent}
+              className="flex items-center gap-2"
+            >
+              <Presentation className="w-4 h-4" />
+              Generate Course Content
             </Button>
             <Button onClick={() => handleExportPDF()} loading={loading} className="flex items-center gap-2">
               <Download className="w-4 h-4" />

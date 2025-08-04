@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 import logging
 
 from .routers.lesson import router as lesson_router
+from .routers.udl_content import router as udl_content_router
 
 # Load environment variables
 load_dotenv()
@@ -17,8 +18,8 @@ logger = logging.getLogger(__name__)
 # Create FastAPI application
 app = FastAPI(
     title="AI Lesson Planning Tool",
-    description="Generate detailed lesson plans using Bloom's Taxonomy and Gagne's Nine Events",
-    version="1.0.0",
+    description="Generate detailed lesson plans using Bloom's Taxonomy and Gagne's Nine Events, plus UDL-compliant multimodal course content",
+    version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -36,6 +37,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(lesson_router)
+app.include_router(udl_content_router)
 
 
 @app.get("/")
@@ -43,9 +45,15 @@ async def root():
     """Root endpoint"""
     return {
         "message": "AI Lesson Planning Tool API",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "docs": "/docs",
-        "status": "running"
+        "status": "running",
+        "features": [
+            "Lesson plan generation with Bloom's Taxonomy",
+            "Gagne's Nine Events integration",
+            "UDL-compliant multimodal course content",
+            "Professional PDF export"
+        ]
     }
 
 
@@ -55,7 +63,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "lesson-planning-api",
-        "version": "1.0.0"
+        "version": "2.0.0"
     }
 
 
