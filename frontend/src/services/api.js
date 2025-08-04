@@ -107,6 +107,68 @@ class APIService {
   }
 
   /**
+   * Export course content to PowerPoint
+   */
+  async exportCourseContentToPowerPoint(courseContent, lessonData) {
+    try {
+      const requestData = {
+        course_content: courseContent,
+        lesson_data: lessonData
+      };
+
+      const response = await api.post('/api/udl-content/export/pptx', requestData, {
+        responseType: 'blob',
+        timeout: 120000 // 2 minutes for PowerPoint generation
+      });
+
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.detail || 'Failed to export PowerPoint');
+    }
+  }
+
+  /**
+   * Export course content to PDF
+   */
+  async exportCourseContentToPDF(courseContent, lessonData) {
+    try {
+      const requestData = {
+        course_content: courseContent,
+        lesson_data: lessonData
+      };
+
+      const response = await api.post('/api/udl-content/export/pdf', requestData, {
+        responseType: 'blob',
+        timeout: 120000 // 2 minutes for PDF generation
+      });
+
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.detail || 'Failed to export PDF');
+    }
+  }
+
+  /**
+   * Export course content to HTML
+   */
+  async exportCourseContentToHTML(courseContent, lessonData) {
+    try {
+      const requestData = {
+        course_content: courseContent,
+        lesson_data: lessonData
+      };
+
+      const response = await api.post('/api/udl-content/export/html', requestData, {
+        timeout: 60000 // 1 minute for HTML generation
+      });
+
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.detail || 'Failed to export HTML');
+    }
+  }
+
+  /**
    * Refine UDL content
    */
   async refineUDLContent(refinementRequest) {
@@ -123,7 +185,7 @@ class APIService {
    */
   async getUDLGuidelines() {
     try {
-      const response = await api.get('/api/udl-content/udl-guidelines');
+      const response = await api.get('/api/udl-content/guidelines');
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.detail || error.message);
@@ -135,7 +197,7 @@ class APIService {
    */
   async getContentModalities() {
     try {
-      const response = await api.get('/api/udl-content/content-modalities');
+      const response = await api.get('/api/udl-content/modalities');
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.detail || error.message);
@@ -147,7 +209,7 @@ class APIService {
    */
   async getAccessibilityFeatures() {
     try {
-      const response = await api.get('/api/udl-content/accessibility-features');
+      const response = await api.get('/api/udl-content/accessibility');
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.detail || error.message);

@@ -80,6 +80,18 @@ export function useApi() {
     return executeRequest(() => apiService.generateCourseContent(request));
   }, [executeRequest]);
 
+  const exportToPowerPoint = useCallback(async (courseContent, lessonData) => {
+    return executeRequest(() => apiService.exportCourseContentToPowerPoint(courseContent, lessonData));
+  }, [executeRequest]);
+
+  const exportToPDF = useCallback(async (courseContent, lessonData) => {
+    return executeRequest(() => apiService.exportCourseContentToPDF(courseContent, lessonData));
+  }, [executeRequest]);
+
+  const exportToHTML = useCallback(async (courseContent, lessonData) => {
+    return executeRequest(() => apiService.exportCourseContentToHTML(courseContent, lessonData));
+  }, [executeRequest]);
+
   const refineUDLContent = useCallback(async (refinementRequest) => {
     return executeRequest(() => apiService.refineUDLContent(refinementRequest));
   }, [executeRequest]);
@@ -94,10 +106,6 @@ export function useApi() {
 
   const getAccessibilityFeatures = useCallback(async () => {
     return executeRequest(() => apiService.getAccessibilityFeatures());
-  }, [executeRequest]);
-
-  const exportToPDF = useCallback(async (lessonData, options) => {
-    return executeRequest(() => apiService.exportToPDF(lessonData, options));
   }, [executeRequest]);
 
   const getBloomLevels = useCallback(async () => {
@@ -118,11 +126,13 @@ export function useApi() {
     generateLesson,
     refineContent,
     generateCourseContent,
+    exportToPowerPoint,
+    exportToPDF,
+    exportToHTML,
     refineUDLContent,
     getUDLGuidelines,
     getContentModalities,
     getAccessibilityFeatures,
-    exportToPDF,
     getBloomLevels,
     getGagneEvents,
     clearError

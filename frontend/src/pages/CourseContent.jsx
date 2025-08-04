@@ -29,7 +29,7 @@ import ContentRefinementModal from '../components/udl/ContentRefinementModal';
 const CourseContent = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { generateCourseContent, refineContent, loading } = useApi();
+  const { generateCourseContent, refineContent, exportToPowerPoint, exportToPDF, exportToHTML, loading } = useApi();
   const { draft } = useLessonDraft();
 
   const [lessonData, setLessonData] = useState(location.state?.lessonData || draft);
@@ -150,9 +150,52 @@ const CourseContent = () => {
     }
   };
 
-  const handleExportContent = (format) => {
-    // TODO: Implement export functionality
-    toast.success(`Exporting to ${format.toUpperCase()}...`);
+  const handleExportContent = async (format) => {
+    if (!courseContent || !lessonData) {
+      toast.error('No course content available for export');
+      return;
+    }
+
+    try {
+      const loadingToast = toast.loading(`Exporting to ${format.toUpperCase()}...`);
+      
+      let blob;
+      if (format === 'pptx') {
+        blob = await exportToPowerPoint(courseContent, lessonData);
+      } else if (format === 'pdf') {
+        blob = await exportToPDF(courseContent, lessonData);
+      } else if (format === 'html') {
+        blob = await exportToHTML(courseContent, lessonData);
+      } else {
+        toast.error(`Unsupported format: ${format}`);
+        return;
+      }
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Generate filename
+      const lessonInfo = lessonData.lesson_info || {};
+      const filename = `${lessonInfo.course_title || 'Course'}_${lessonInfo.lesson_topic || 'Lesson'}.${format}`;
+      link.download = filename.replace(/\s+/g, '_').replace(/[\/\\]/g, '_');
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up
+      window.URL.revokeObjectURL(url);
+      
+      toast.dismiss(loadingToast);
+      toast.success(`${format.toUpperCase()} exported successfully!`);
+      
+    } catch (error) {
+      console.error(`Export error:`, error);
+      toast.error(`Failed to export ${format.toUpperCase()}: ${error.message}`);
+    }
   };
 
   if (!lessonData) return null;
@@ -244,6 +287,14 @@ const CourseContent = () => {
                       >
                         <Download className="w-4 h-4 mr-2" />
                         Export as PDF
+                      </Button>
+                      <Button
+                        onClick={() => handleExportContent('html')}
+                        variant="outline"
+                        className="w-full"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Export as HTML
                       </Button>
                     </div>
                   )}
