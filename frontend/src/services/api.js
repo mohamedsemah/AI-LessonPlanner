@@ -4,7 +4,7 @@ import { API_BASE_URL } from '../utils/constants';
 // Create axios instance with default config
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 120000, // 2 minutes for AI generation
+  timeout: 180000, // 3 minutes for AI generation
   headers: {
     'Content-Type': 'application/json',
   },
@@ -89,6 +89,68 @@ class APIService {
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.detail || 'Failed to export PDF');
+    }
+  }
+
+  /**
+   * Generate UDL-compliant course content
+   */
+  async generateCourseContent(request) {
+    try {
+      const response = await api.post('/api/udl-content/generate', request, {
+        timeout: 300000 // 5 minutes for UDL content generation
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.detail || error.message);
+    }
+  }
+
+  /**
+   * Refine UDL content
+   */
+  async refineUDLContent(refinementRequest) {
+    try {
+      const response = await api.post('/api/udl-content/refine', refinementRequest);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.detail || error.message);
+    }
+  }
+
+  /**
+   * Get UDL guidelines
+   */
+  async getUDLGuidelines() {
+    try {
+      const response = await api.get('/api/udl-content/udl-guidelines');
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.detail || error.message);
+    }
+  }
+
+  /**
+   * Get content modalities
+   */
+  async getContentModalities() {
+    try {
+      const response = await api.get('/api/udl-content/content-modalities');
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.detail || error.message);
+    }
+  }
+
+  /**
+   * Get accessibility features
+   */
+  async getAccessibilityFeatures() {
+    try {
+      const response = await api.get('/api/udl-content/accessibility-features');
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.detail || error.message);
     }
   }
 

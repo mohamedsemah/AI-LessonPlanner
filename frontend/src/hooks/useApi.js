@@ -76,6 +76,26 @@ export function useApi() {
     }
   }, []);
 
+  const generateCourseContent = useCallback(async (request) => {
+    return executeRequest(() => apiService.generateCourseContent(request));
+  }, [executeRequest]);
+
+  const refineUDLContent = useCallback(async (refinementRequest) => {
+    return executeRequest(() => apiService.refineUDLContent(refinementRequest));
+  }, [executeRequest]);
+
+  const getUDLGuidelines = useCallback(async () => {
+    return executeRequest(() => apiService.getUDLGuidelines());
+  }, [executeRequest]);
+
+  const getContentModalities = useCallback(async () => {
+    return executeRequest(() => apiService.getContentModalities());
+  }, [executeRequest]);
+
+  const getAccessibilityFeatures = useCallback(async () => {
+    return executeRequest(() => apiService.getAccessibilityFeatures());
+  }, [executeRequest]);
+
   const exportToPDF = useCallback(async (lessonData, options) => {
     return executeRequest(() => apiService.exportToPDF(lessonData, options));
   }, [executeRequest]);
@@ -97,6 +117,11 @@ export function useApi() {
     error,
     generateLesson,
     refineContent,
+    generateCourseContent,
+    refineUDLContent,
+    getUDLGuidelines,
+    getContentModalities,
+    getAccessibilityFeatures,
     exportToPDF,
     getBloomLevels,
     getGagneEvents,

@@ -5,6 +5,7 @@ import Layout from './components/layout/Layout';
 import Home from './pages/Home';
 import LessonWizard from './pages/LessonWizard';
 import Results from './pages/Results';
+import CourseContent from './pages/CourseContent';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/create" element={<LessonWizard />} />
           <Route path="/results" element={<Results />} />
+          <Route path="/course-content" element={<CourseContent />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </motion.div>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, BookOpen, Target, Brain, Sparkles, CheckCircle, Users, Clock, Download } from 'lucide-react';
+import { ArrowRight, BookOpen, Target, Brain, Sparkles, CheckCircle, Users, Clock, Download, Presentation } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 
@@ -42,6 +42,12 @@ const Home = () => {
       title: 'Time Management',
       description: 'Automatic duration allocation across instructional events.',
       color: 'text-orange-500'
+    },
+    {
+      icon: Presentation,
+      title: 'UDL Course Content',
+      description: 'Generate multimodal presentations compliant with Universal Design for Learning principles.',
+      color: 'text-teal-500'
     }
   ];
 
