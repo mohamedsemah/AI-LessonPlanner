@@ -20,17 +20,14 @@ class ContentModality(str, Enum):
 class SlideContent(BaseModel):
     slide_number: int
     title: str
-    content: str  # Changed from main_content
-    gagne_event: int = 0
-    gagne_event_name: str = "Unknown"
-    duration_minutes: float = 5.0
-    content_modality: str = "mixed"  # Changed from content_type
+    content_type: Literal["text", "image", "video", "interactive", "mixed"]
+    main_content: str
     visual_elements: List[Dict[str, Any]] = Field(default_factory=list)
     audio_script: Optional[str] = None
-    speaker_notes: Optional[str] = None  # Added new field
-    udl_guidelines: List[str] = Field(default_factory=list)
     accessibility_features: List[str] = Field(default_factory=list)
-    generated_image: Optional[str] = None  # Added for AI-generated images
+    udl_guidelines: List[str] = Field(default_factory=list)
+    duration_minutes: float
+    notes: Optional[str] = None
 
 
 class UDLGuideline(BaseModel):

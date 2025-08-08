@@ -1,7 +1,7 @@
 import axios from 'axios';
-import { API_BASE_URL } from '../utils/constants';
+import { API_BASE_URL, PREMIUM_API_BASE_URL } from '../utils/constants';
 
-// Create axios instance with default config
+// Create axios instance for Python backend (lesson planning)
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 180000, // 3 minutes for AI generation
@@ -10,7 +10,16 @@ const api = axios.create({
   },
 });
 
-// Request interceptor
+// Create axios instance for Node.js backend (premium exports)
+const premiumApi = axios.create({
+  baseURL: PREMIUM_API_BASE_URL,
+  timeout: 180000, // 3 minutes for premium generation
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Request interceptor for Python backend
 api.interceptors.request.use(
   (config) => {
     // Add any auth headers here if needed
@@ -21,8 +30,40 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor
+// Response interceptor for Python backend
 api.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  (error) => {
+    // Handle common errors
+    if (error.code === 'ECONNABORTED') {
+      error.message = 'Request timeout. Please try again.';
+    } else if (error.response?.status === 500) {
+      error.message = 'Server error. Please try again later.';
+    } else if (error.response?.status === 429) {
+      error.message = 'Too many requests. Please wait a moment and try again.';
+    } else if (!error.response) {
+      error.message = 'Network error. Please check your connection.';
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+// Request interceptor for Node.js backend
+premiumApi.interceptors.request.use(
+  (config) => {
+    // Add any auth headers here if needed
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor for Node.js backend
+premiumApi.interceptors.response.use(
   (response) => {
     return response;
   },
@@ -107,18 +148,19 @@ class APIService {
   }
 
   /**
-   * Export course content to PowerPoint
+   * Export course content to PowerPoint (Premium)
    */
-  async exportCourseContentToPowerPoint(courseContent, lessonData) {
+  async exportCourseContentToPowerPoint(courseContent, lessonData, designPreferences = {}) {
     try {
       const requestData = {
-        course_content: courseContent,
-        lesson_data: lessonData
+        courseContent: courseContent,
+        lessonData: lessonData,
+        designPreferences: designPreferences
       };
 
-      const response = await api.post('/api/udl-content/export/pptx', requestData, {
+      const response = await premiumApi.post('/api/premium/export/pptx', requestData, {
         responseType: 'blob',
-        timeout: 120000 // 2 minutes for PowerPoint generation
+        timeout: 180000 // 3 minutes for premium PowerPoint generation
       });
 
       return response.data;
@@ -128,43 +170,24 @@ class APIService {
   }
 
   /**
-   * Export course content to PDF
+   * Export course content to PDF (Premium)
    */
-  async exportCourseContentToPDF(courseContent, lessonData) {
+  async exportCourseContentToPDF(courseContent, lessonData, designPreferences = {}) {
     try {
       const requestData = {
-        course_content: courseContent,
-        lesson_data: lessonData
+        courseContent: courseContent,
+        lessonData: lessonData,
+        designPreferences: designPreferences
       };
 
-      const response = await api.post('/api/udl-content/export/pdf', requestData, {
+      const response = await premiumApi.post('/api/premium/export/pdf', requestData, {
         responseType: 'blob',
-        timeout: 120000 // 2 minutes for PDF generation
+        timeout: 180000 // 3 minutes for premium PDF generation
       });
 
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.detail || 'Failed to export PDF');
-    }
-  }
-
-  /**
-   * Export course content to HTML
-   */
-  async exportCourseContentToHTML(courseContent, lessonData) {
-    try {
-      const requestData = {
-        course_content: courseContent,
-        lesson_data: lessonData
-      };
-
-      const response = await api.post('/api/udl-content/export/html', requestData, {
-        timeout: 60000 // 1 minute for HTML generation
-      });
-
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.detail || 'Failed to export HTML');
     }
   }
 

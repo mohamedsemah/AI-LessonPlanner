@@ -29,7 +29,7 @@ import ContentRefinementModal from '../components/udl/ContentRefinementModal';
 const CourseContent = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { generateCourseContent, refineContent, exportToPowerPoint, exportToPDF, exportToHTML, loading } = useApi();
+  const { generateCourseContent, refineContent, exportToPowerPoint, exportToPDF, loading } = useApi();
   const { draft } = useLessonDraft();
 
   const [lessonData, setLessonData] = useState(location.state?.lessonData || draft);
@@ -40,6 +40,11 @@ const CourseContent = () => {
     targetAudience: [],
     technologyConstraints: '',
     slideDuration: 'balanced'
+  });
+  
+  const [designPreferences, setDesignPreferences] = useState({
+    theme: 'modern',
+    template: 'modern'
   });
   const [showRefinementModal, setShowRefinementModal] = useState(false);
   const [selectedSlide, setSelectedSlide] = useState(null);
@@ -161,11 +166,9 @@ const CourseContent = () => {
       
       let blob;
       if (format === 'pptx') {
-        blob = await exportToPowerPoint(courseContent, lessonData);
+        blob = await exportToPowerPoint(courseContent, lessonData, designPreferences);
       } else if (format === 'pdf') {
-        blob = await exportToPDF(courseContent, lessonData);
-      } else if (format === 'html') {
-        blob = await exportToHTML(courseContent, lessonData);
+        blob = await exportToPDF(courseContent, lessonData, designPreferences);
       } else {
         toast.error(`Unsupported format: ${format}`);
         return;
@@ -250,6 +253,48 @@ const CourseContent = () => {
                   onChange={setUdlPreferences}
                 />
                 
+                {/* Design Preferences */}
+                <div className="mt-6 border-t pt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Eye className="w-5 h-5 text-primary-600" />
+                    Design Preferences
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Theme
+                      </label>
+                      <select
+                        value={designPreferences.theme}
+                        onChange={(e) => setDesignPreferences(prev => ({ ...prev, theme: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      >
+                        <option value="modern">Modern</option>
+                        <option value="corporate">Corporate</option>
+                        <option value="creative">Creative</option>
+                        <option value="minimal">Minimal</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Template
+                      </label>
+                      <select
+                        value={designPreferences.template}
+                        onChange={(e) => setDesignPreferences(prev => ({ ...prev, template: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      >
+                        <option value="modern">Modern</option>
+                        <option value="corporate">Corporate</option>
+                        <option value="creative">Creative</option>
+                        <option value="minimal">Minimal</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                
                 <div className="mt-6 space-y-4">
                   <Button
                     onClick={handleGenerateContent}
@@ -287,14 +332,6 @@ const CourseContent = () => {
                       >
                         <Download className="w-4 h-4 mr-2" />
                         Export as PDF
-                      </Button>
-                      <Button
-                        onClick={() => handleExportContent('html')}
-                        variant="outline"
-                        className="w-full"
-                      >
-                        <Download className="w-4 h-4 mr-2" />
-                        Export as HTML
                       </Button>
                     </div>
                   )}

@@ -13,19 +13,17 @@ from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 import markdown
 import re
-from .slide_design_service import SlideDesignService
 
 logger = logging.getLogger(__name__)
 
 class ExportService:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        self.slide_design_service = SlideDesignService()
     
     async def export_to_powerpoint(self, course_content: Dict[str, Any], lesson_data: Dict[str, Any]) -> io.BytesIO:
-        """Export course content to PowerPoint format with premium design"""
+        """Export course content to PowerPoint format"""
         try:
-            self.logger.info("Creating premium PowerPoint presentation")
+            self.logger.info("Creating PowerPoint presentation")
             
             # Create a new presentation
             prs = Presentation()
@@ -114,40 +112,10 @@ class ExportService:
             raise Exception(f"Failed to create PowerPoint: {str(e)}")
     
     async def export_to_pdf(self, course_content: Dict[str, Any], lesson_data: Dict[str, Any]) -> io.BytesIO:
-        """Export course content to PDF format using premium HTML/CSS design"""
+        """Export course content to PDF format"""
         try:
-            self.logger.info("Creating premium PDF document")
+            self.logger.info("Creating PDF document")
             
-            # Generate premium HTML presentation
-            slides = course_content.get('slides', [])
-            presentation_title = course_content.get('presentation_title', 'Course Content')
-            lesson_info = lesson_data.get("lesson_info", {})
-            
-            # Convert slides to list of dicts for HTML generation
-            slides_data = []
-            for slide in slides:
-                slide_dict = slide.dict() if hasattr(slide, 'dict') else slide
-                slides_data.append(slide_dict)
-            
-            # Generate premium HTML presentation
-            html_content = self.slide_design_service.generate_presentation_html(
-                slides_data, presentation_title, lesson_info
-            )
-            
-            # Convert HTML to PDF using WeasyPrint or similar
-            # For now, we'll use ReportLab as fallback
-            pdf_buffer = await self._html_to_pdf_fallback(html_content, presentation_title)
-            
-            self.logger.info(f"PDF export completed with {len(slides)} slides")
-            return pdf_buffer
-            
-        except Exception as e:
-            self.logger.error(f"Error in PDF export: {str(e)}")
-            raise Exception(f"Failed to create PDF: {str(e)}")
-    
-    async def _html_to_pdf_fallback(self, html_content: str, title: str) -> io.BytesIO:
-        """Fallback method to convert HTML to PDF using ReportLab"""
-        try:
             # Create PDF buffer
             buffer = io.BytesIO()
             doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
@@ -174,7 +142,9 @@ class ExportService:
             story = []
             
             # Add title page
-            story.append(Paragraph(title, title_style))
+            lesson_info = lesson_data.get("lesson_info", {})
+            title_text = f"{lesson_info.get('course_title', 'Course')} - {lesson_info.get('lesson_topic', 'Lesson')}"
+            story.append(Paragraph(title_text, title_style))
             story.append(Spacer(1, 20))
             
             # Add subtitle
@@ -182,88 +152,88 @@ class ExportService:
             story.append(Paragraph(subtitle_text, heading_style))
             story.append(Spacer(1, 20))
             
-            # Extract content from HTML (simplified)
-            # This is a basic extraction - in a full implementation, you'd use a proper HTML parser
-            content_lines = html_content.split('\n')
-            current_section = ""
+            # Add metadata
+            metadata = [
+                f"Total Slides: {len(course_content.get('slides', []))}",
+                f"Estimated Duration: {course_content.get('estimated_duration', 0)} minutes",
+                f"UDL Compliance: {course_content.get('udl_compliance_report', {}).get('overall_compliance', 0) * 100:.1f}%"
+            ]
             
-            for line in content_lines:
-                if '<h2' in line:
-                    # Extract slide title
-                    title_match = re.search(r'<h2[^>]*>(.*?)</h2>', line)
-                    if title_match:
-                        story.append(Paragraph(title_match.group(1), heading_style))
-                        story.append(Spacer(1, 6))
-                elif '<p>' in line:
-                    # Extract paragraph content
-                    p_match = re.search(r'<p[^>]*>(.*?)</p>', line)
-                    if p_match:
-                        content = p_match.group(1)
-                        # Remove HTML tags
-                        content = re.sub(r'<[^>]+>', '', content)
-                        if content.strip():
-                            story.append(Paragraph(content, normal_style))
-                            story.append(Spacer(1, 6))
+            for meta in metadata:
+                story.append(Paragraph(meta, normal_style))
+                story.append(Spacer(1, 6))
+            
+            story.append(PageBreak())
+            
+            # Add slides content
+            slides = course_content.get('slides', [])
+            current_event = None
+            
+            for i, slide_data in enumerate(slides, 1):
+                # Check if this is a new event
+                if slide_data.get('gagne_event') != current_event:
+                    current_event = slide_data.get('gagne_event')
+                    
+                    # Add event header
+                    event_title = f"Event {current_event}: {slide_data.get('gagne_event_name', 'Unknown')}"
+                    story.append(Paragraph(event_title, heading_style))
+                    story.append(Spacer(1, 12))
+                
+                # Add slide content
+                slide_title = f"Slide {i}: {slide_data.get('title', 'Untitled')}"
+                story.append(Paragraph(slide_title, heading_style))
+                story.append(Spacer(1, 6))
+                
+                # Add main content
+                if slide_data.get('content'):
+                    # Convert markdown to plain text for PDF
+                    content_text = self._convert_markdown_to_text(slide_data['content'])
+                    story.append(Paragraph(content_text, normal_style))
+                    story.append(Spacer(1, 6))
+                
+                # Add visual elements
+                visual_elements = slide_data.get('visual_elements', [])
+                if visual_elements:
+                    story.append(Paragraph("Visual Elements:", normal_style))
+                    for element in visual_elements:
+                        if isinstance(element, dict):
+                            element_text = f"• {element.get('description', 'Visual element')}"
+                        else:
+                            element_text = f"• {element}"
+                        story.append(Paragraph(element_text, normal_style))
+                    story.append(Spacer(1, 6))
+                
+                # Add audio script
+                if slide_data.get('audio_script'):
+                    story.append(Paragraph("Audio Script:", normal_style))
+                    story.append(Paragraph(slide_data['audio_script'], normal_style))
+                    story.append(Spacer(1, 6))
+                
+                # Add speaker notes
+                if slide_data.get('speaker_notes'):
+                    story.append(Paragraph("Speaker Notes:", normal_style))
+                    story.append(Paragraph(slide_data['speaker_notes'], normal_style))
+                    story.append(Spacer(1, 6))
+                
+                # Add UDL guidelines
+                udl_guidelines = slide_data.get('udl_guidelines', [])
+                if udl_guidelines:
+                    story.append(Paragraph("UDL Guidelines:", normal_style))
+                    for guideline in udl_guidelines:
+                        story.append(Paragraph(f"• {guideline}", normal_style))
+                
+                story.append(Spacer(1, 20))
             
             # Build PDF
             doc.build(story)
             buffer.seek(0)
             
+            self.logger.info(f"PDF export completed with {len(slides)} slides")
             return buffer
             
         except Exception as e:
-            self.logger.error(f"Error in HTML to PDF conversion: {str(e)}")
-            # Return a simple PDF as fallback
-            return await self._create_simple_pdf(title)
-    
-    async def _create_simple_pdf(self, title: str) -> io.BytesIO:
-        """Create a simple PDF as fallback"""
-        try:
-            buffer = io.BytesIO()
-            doc = SimpleDocTemplate(buffer, pagesize=A4)
-            
-            styles = getSampleStyleSheet()
-            story = []
-            
-            story.append(Paragraph(title, styles['Heading1']))
-            story.append(Spacer(1, 20))
-            story.append(Paragraph("Course content will be available in the HTML export.", styles['Normal']))
-            
-            doc.build(story)
-            buffer.seek(0)
-            return buffer
-            
-        except Exception as e:
-            self.logger.error(f"Error creating simple PDF: {str(e)}")
-            raise Exception("Failed to create PDF")
-    
-    def export_to_html(self, course_content: Dict[str, Any], lesson_data: Dict[str, Any]) -> str:
-        """Export course content to premium HTML format"""
-        try:
-            self.logger.info("Creating premium HTML presentation")
-            
-            # Generate premium HTML presentation
-            slides = course_content.get('slides', [])
-            presentation_title = course_content.get('presentation_title', 'Course Content')
-            lesson_info = lesson_data.get("lesson_info", {})
-            
-            # Convert slides to list of dicts for HTML generation
-            slides_data = []
-            for slide in slides:
-                slide_dict = slide.dict() if hasattr(slide, 'dict') else slide
-                slides_data.append(slide_dict)
-            
-            # Generate premium HTML presentation
-            html_content = self.slide_design_service.generate_presentation_html(
-                slides_data, presentation_title, lesson_info
-            )
-            
-            self.logger.info(f"HTML export completed with {len(slides)} slides")
-            return html_content
-            
-        except Exception as e:
-            self.logger.error(f"Error in HTML export: {str(e)}")
-            return f"<html><body><h1>Error generating HTML presentation: {str(e)}</h1></body></html>"
+            self.logger.error(f"Error in PDF export: {str(e)}")
+            raise Exception(f"Failed to create PDF: {str(e)}")
     
     def _convert_markdown_to_text(self, markdown_text: str) -> str:
         """Convert markdown text to plain text for PDF"""

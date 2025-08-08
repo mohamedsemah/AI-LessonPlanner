@@ -8,8 +8,6 @@ from ..models.udl_content import (
     CourseContentRequest, CourseContentResponse, SlideContent, 
     UDLComplianceReport, UDLPrinciple, ContentModality
 )
-from .slide_design_service import SlideDesignService
-import re
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -24,7 +22,6 @@ class UDLContentService:
         
         self.client = AsyncOpenAI(api_key=api_key)
         self.udl_guidelines = self._initialize_udl_guidelines()
-        self.slide_design_service = SlideDesignService()
         logger.info("UDLContentService initialized successfully")
 
     def _initialize_udl_guidelines(self) -> Dict[str, Any]:
@@ -117,361 +114,334 @@ class UDLContentService:
             
             logger.info(f"Generated {len(slides)} slides")
             
-            # Generate AI images for each slide
-            slides_with_images = await self._add_ai_images_to_slides(slides)
-            
             # Calculate UDL compliance
-            compliance_report = await self._calculate_udl_compliance(slides_with_images, request)
+            compliance_report = await self._calculate_udl_compliance(slides, request)
             
             # Generate presentation metadata
             presentation_title = f"{lesson_info.get('course_title', 'Course')} - {lesson_info.get('lesson_topic', 'Lesson')}"
-            total_duration = sum(slide.duration_minutes for slide in slides_with_images)
+            total_duration = sum(slide.duration_minutes for slide in slides)
             
             logger.info("Course content generation completed successfully")
             
             return CourseContentResponse(
                 presentation_title=presentation_title,
-                total_slides=len(slides_with_images),
+                total_slides=len(slides),
                 estimated_duration=int(total_duration),
-                slides=slides_with_images,
+                slides=slides,
                 udl_compliance_report=compliance_report.dict(),
-                accessibility_features=self._extract_accessibility_features(slides_with_images),
+                accessibility_features=self._extract_accessibility_features(slides),
                 export_formats=["pptx", "pdf", "html"],
                 created_at=str(asyncio.get_event_loop().time())
             )
         except Exception as e:
             logger.error(f"Error in generate_course_content: {str(e)}")
-            raise e
-
-    async def _add_ai_images_to_slides(self, slides: List[SlideContent]) -> List[SlideContent]:
-        """Add AI-generated images to each slide"""
-        try:
-            logger.info("Starting AI image generation for slides")
-            
-            slides_with_images = []
-            for i, slide in enumerate(slides):
-                logger.info(f"Generating image for slide {i+1}/{len(slides)}: {slide.title}")
-                
-                # Convert slide to dict for image generation
-                slide_dict = slide.dict()
-                
-                # Generate image using DALL-E 3
-                try:
-                    generated_image = await self.slide_design_service.generate_slide_image(
-                        slide_dict, 
-                        self.slide_design_service._determine_slide_type(slide_dict)
-                    )
-                    
-                    if generated_image:
-                        slide_dict['generated_image'] = generated_image
-                        logger.info(f"Image generated successfully for slide {i+1}")
-                    else:
-                        logger.warning(f"No image generated for slide {i+1}")
-                        
-                except Exception as e:
-                    logger.error(f"Error generating image for slide {i+1}: {str(e)}")
-                    # Continue without image if generation fails
-                
-                # Create new SlideContent with image
-                slide_with_image = SlideContent(**slide_dict)
-                slides_with_images.append(slide_with_image)
-            
-            logger.info(f"AI image generation completed for {len(slides_with_images)} slides")
-            return slides_with_images
-            
-        except Exception as e:
-            logger.error(f"Error in _add_ai_images_to_slides: {str(e)}")
-            # Return slides without images if image generation fails
-            return slides
+            raise
 
     async def _generate_slides_for_gagne_events(
         self, gagne_events: List[Dict], objectives: List[Dict], 
         lesson_info: Dict, request: CourseContentRequest
     ) -> List[SlideContent]:
-        """Generate slides for each Gagne event with enhanced content"""
+        """Generate slides for each Gagne event with UDL principles"""
         try:
-            all_slides = []
-            start_slide_number = 1
+            slides = []
+            slide_number = 1
             
             for event in gagne_events:
+                logger.info(f"Generating slides for Gagne event {event.get('event_number', 'unknown')}")
                 event_slides = await self._create_slides_for_event(
-                    event, objectives, lesson_info, start_slide_number, request
+                    event, objectives, lesson_info, slide_number, request
                 )
-                all_slides.extend(event_slides)
-                start_slide_number += len(event_slides)
+                slides.extend(event_slides)
+                slide_number += len(event_slides)
             
-            return all_slides
+            return slides
         except Exception as e:
             logger.error(f"Error in _generate_slides_for_gagne_events: {str(e)}")
-            raise e
+            raise
 
     async def _create_slides_for_event(
         self, event: Dict, objectives: List[Dict], lesson_info: Dict, 
         start_slide_number: int, request: CourseContentRequest
     ) -> List[SlideContent]:
-        """Create enhanced slides for a specific Gagne event"""
+        """Create slides for a specific Gagne event"""
         try:
-            event_name = event.get("event_name", "Unknown Event")
+            event_number = event.get("event_number", 1)
+            event_name = event.get("event_name", "")
+            activities = event.get("activities", [])
             duration = event.get("duration_minutes", 10)
-            description = event.get("description", "")
             
-            logger.info(f"Generating slides for Gagne event {event.get('event_number', 'Unknown')}")
-            
-            # Calculate number of slides based on duration and preferences
+            # Calculate number of slides based on duration and preference
             slide_count = self._calculate_slide_count(duration, request.slide_duration_preference)
-            logger.info(f"Creating {slide_count} slides for event {event.get('event_number', 'Unknown')}: {event_name}")
             
-            slides = []
-            for i in range(slide_count):
-                slide_number = start_slide_number + i
-                
-                # Create enhanced slide content with AI
-                slide_data = await self._create_enhanced_slide_content(
-                    event, objectives, lesson_info, slide_number, request, i, slide_count
-                )
-                
-                # Create slide object
-                slide = self._create_slide_object(slide_data, slide_number)
-                slides.append(slide)
+            logger.info(f"Creating {slide_count} slides for event {event_number}: {event_name}")
             
-            logger.info(f"Successfully generated {len(slides)} slides for event {event.get('event_number', 'Unknown')} (attempt 1)")
-            return slides
-            
-        except Exception as e:
-            logger.error(f"Error in _create_slides_for_event: {str(e)}")
-            # Return fallback slide
-            fallback_slide = self._create_enhanced_fallback_slide(event, objectives, start_slide_number)
-            return [fallback_slide]
-
-    async def _create_enhanced_slide_content(
-        self, event: Dict, objectives: List[Dict], lesson_info: Dict, 
-        slide_number: int, request: CourseContentRequest, slide_index: int, total_slides: int
-    ) -> Dict[str, Any]:
-        """Create enhanced slide content with AI-generated text and visuals"""
-        try:
-            event_name = event.get("event_name", "Unknown Event")
-            event_number = event.get("event_number", 0)
-            description = event.get("description", "")
-            
-            # Create detailed prompt for AI content generation
             prompt = f"""
-            Create engaging slide content for a {event_name} event in a lesson about {lesson_info.get('lesson_topic', 'the topic')}.
+            Create {slide_count} presentation slides for Gagne's Event {event_number}: {event_name}
             
-            Event Details:
-            - Event: {event_name} (Event {event_number})
-            - Description: {description}
-            - Slide {slide_index + 1} of {total_slides} for this event
+            LESSON CONTEXT:
+            Course: {lesson_info.get('course_title', '')}
+            Topic: {lesson_info.get('lesson_topic', '')}
+            Level: {lesson_info.get('grade_level', '')}
+            Event Duration: {duration} minutes
             
-            Learning Objectives:
+            LEARNING OBJECTIVES:
             {json.dumps([obj.get('objective', '') for obj in objectives], indent=2)}
             
-            Requirements:
-            1. Create a compelling slide title
-            2. Generate engaging content with bullet points, examples, and explanations
-            3. Include visual elements descriptions (diagrams, charts, images that should be included)
-            4. Create an audio script for narration
-            5. Add speaker notes for the presenter
-            6. Apply UDL guidelines for accessibility and engagement
+            ACTIVITIES:
+            {json.dumps(activities, indent=2)}
             
-            Return the content as a JSON object with these fields:
-            - title: Engaging slide title
-            - content: Main content with markdown formatting
-            - visual_elements: Array of visual element descriptions
-            - audio_script: Script for audio narration
-            - speaker_notes: Notes for the presenter
-            - udl_guidelines: Array of UDL guidelines applied
-            - accessibility_features: Array of accessibility features
+            UDL REQUIREMENTS:
+            - Provide multiple means of representation (visual, auditory, textual)
+            - Include accessibility features (alt text, captions, keyboard navigation)
+            - Support multiple means of action and expression
+            - Engage learners through various modalities
+            
+            REQUIREMENTS:
+            - Return ONLY valid JSON array with exactly {slide_count} slides
+            - Each slide must have: title, main_content, content_type, visual_elements (array), audio_script, accessibility_features (array), udl_guidelines (array), duration_minutes, notes
+            - content_type must be one of: "text", "image", "video", "interactive", "mixed"
+            - duration_minutes should be a number
+            - All arrays should contain strings
+            - visual_elements should be an array of strings (image/video filenames)
+            
+            SLIDE CONTENT REQUIREMENTS:
+            - Create actual slide content with bullet points, headings, and real presentation material
+            - Include specific examples, definitions, and explanations
+            - Add visual elements like diagrams, charts, images, or videos
+            - Provide detailed speaker notes with teaching tips
+            - Include interactive elements where appropriate
+            - Make content engaging and accessible
+            
+            EXAMPLE FORMAT:
+            [
+                {{
+                    "title": "Introduction to Queues",
+                    "main_content": "# Introduction to Queues\\n\\n## What is a Queue?\\n\\n- A **First-In-First-Out (FIFO)** data structure\\n- Elements are added at the **rear** and removed from the **front**\\n- Like a line of people waiting for service\\n\\n## Key Characteristics:\\n\\n1. **Ordered collection** of elements\\n2. **Two main operations**:\\n   - Enqueue (add to rear)\\n   - Dequeue (remove from front)\\n3. **No random access** - can only access front element\\n\\n## Real-World Examples:\\n\\n- Print queue\\n- Customer service line\\n- Task scheduling\\n- Breadth-first search",
+                    "content_type": "mixed",
+                    "visual_elements": ["queue_diagram.png", "fifo_animation.gif", "real_world_examples.jpg"],
+                    "audio_script": "Welcome to our lesson on queues. A queue is a First-In-First-Out data structure, meaning the first element added is the first one removed. Think of it like a line of people waiting for service - the first person in line is the first one served. Queues have two main operations: enqueue, which adds an element to the rear, and dequeue, which removes an element from the front. Real-world examples include print queues, customer service lines, and task scheduling systems.",
+                    "accessibility_features": ["alt_text", "keyboard_navigation", "screen_reader", "high_contrast"],
+                    "udl_guidelines": ["multiple_representation", "comprehension", "engagement"],
+                    "duration_minutes": 3.0,
+                    "notes": "Start with the real-world analogy of a line of people. Show the queue diagram and explain FIFO principle. Use the animation to demonstrate enqueue/dequeue operations. Connect to students' everyday experiences with waiting in lines."
+                }}
+            ]
+            
+            CRITICAL: Return ONLY the JSON array, no markdown, no code blocks, no explanations.
             """
             
-            response = await self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": "You are an expert educational content creator specializing in UDL-compliant slide design. Create engaging, accessible content that follows Universal Design for Learning principles."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7,
-                max_tokens=2000
-            )
-            
-            try:
-                # Parse AI response
-                content_text = response.choices[0].message.content.strip()
-                
-                # Try to extract JSON from the response
-                json_match = re.search(r'\{.*\}', content_text, re.DOTALL)
-                if json_match:
-                    slide_data = json.loads(json_match.group())
-                else:
-                    # Fallback: create structured content from text
-                    slide_data = self._parse_content_to_structured_format(content_text, event_name)
-                
-                # Add metadata
-                slide_data.update({
-                    'gagne_event': event_number,
-                    'gagne_event_name': event_name,
-                    'duration_minutes': event.get('duration_minutes', 10) / total_slides,
-                    'slide_number': slide_number,
-                    'content_modality': 'mixed',
-                    'accessibility_features': slide_data.get('accessibility_features', ['alt_text', 'keyboard_navigation'])
-                })
-                
-                return slide_data
-                
-            except json.JSONDecodeError as e:
-                logger.warning(f"Failed to parse AI response for event {event_number}, using fallback: {str(e)}")
-                return self._create_enhanced_fallback_slide_content(event, objectives, slide_number, slide_index, total_slides)
+            # Try multiple approaches to get valid JSON
+            for attempt in range(3):
+                try:
+                    response = await self.client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[
+                            {"role": "system", "content": "You are an expert instructional designer. Return ONLY valid JSON arrays. No markdown, no explanations."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.3,  # Lower temperature for more consistent output
+                        max_tokens=4000
+                    )
+                    
+                    content = response.choices[0].message.content
+                    if content is None:
+                        raise ValueError("AI returned null content")
+                    
+                    content = content.strip()
+                    
+                    # Remove any markdown formatting if present
+                    if content.startswith("```json"):
+                        content = content[7:]
+                    if content.endswith("```"):
+                        content = content[:-3]
+                    content = content.strip()
+                    
+                    # Try to parse as JSON
+                    slides_data = json.loads(content)
+                    
+                    # Ensure it's an array
+                    if isinstance(slides_data, dict) and 'slides' in slides_data:
+                        slides_data = slides_data['slides']
+                    elif not isinstance(slides_data, list):
+                        slides_data = [slides_data]
+                    
+                    logger.info(f"Successfully generated {len(slides_data)} slides for event {event_number} (attempt {attempt + 1})")
+                    return [self._create_slide_object(slide_data, start_slide_number + i) for i, slide_data in enumerate(slides_data)]
+                    
+                except (json.JSONDecodeError, KeyError, ValueError) as e:
+                    logger.warning(f"Attempt {attempt + 1} failed for event {event_number}: {str(e)}")
+                    if attempt < 2:  # Try again
+                        continue
+                    else:
+                        # Final attempt failed, use fallback
+                        logger.warning(f"All attempts failed for event {event_number}, using enhanced fallback")
+                        return [self._create_enhanced_fallback_slide(event, objectives, start_slide_number)]
                 
         except Exception as e:
-            logger.error(f"Error in _create_enhanced_slide_content: {str(e)}")
-            return self._create_enhanced_fallback_slide_content(event, objectives, slide_number, slide_index, total_slides)
-
-    def _parse_content_to_structured_format(self, content_text: str, event_name: str) -> Dict[str, Any]:
-        """Parse AI text response into structured slide format"""
-        try:
-            # Extract title (first line or after "Title:")
-            title_match = re.search(r'Title:\s*(.+)', content_text, re.IGNORECASE)
-            title = title_match.group(1).strip() if title_match else f"{event_name} Content"
-            
-            # Extract main content
-            content_sections = content_text.split('\n\n')
-            content = content_sections[0] if content_sections else content_text
-            
-            # Extract visual elements
-            visual_elements = []
-            visual_match = re.search(r'Visual Elements?:\s*(.+)', content_text, re.IGNORECASE | re.DOTALL)
-            if visual_match:
-                visual_text = visual_match.group(1)
-                visual_elements = [item.strip() for item in visual_text.split('\n') if item.strip()]
-            
-            # Extract audio script
-            audio_script = ""
-            audio_match = re.search(r'Audio Script:\s*(.+)', content_text, re.IGNORECASE | re.DOTALL)
-            if audio_match:
-                audio_script = audio_match.group(1).strip()
-            
-            # Extract speaker notes
-            speaker_notes = ""
-            notes_match = re.search(r'Speaker Notes?:\s*(.+)', content_text, re.IGNORECASE | re.DOTALL)
-            if notes_match:
-                speaker_notes = notes_match.group(1).strip()
-            
-            return {
-                'title': title,
-                'content': content,
-                'visual_elements': visual_elements,
-                'audio_script': audio_script,
-                'speaker_notes': speaker_notes,
-                'udl_guidelines': ['Multiple representation', 'Engagement', 'Action expression'],
-                'accessibility_features': ['alt_text', 'keyboard_navigation', 'high_contrast']
-            }
-            
-        except Exception as e:
-            logger.error(f"Error parsing content to structured format: {str(e)}")
-            return self._create_enhanced_fallback_slide_content({}, [], 1, 0, 1)
-
-    def _create_enhanced_fallback_slide_content(self, event: Dict, objectives: List[Dict], slide_number: int, slide_index: int, total_slides: int) -> Dict[str, Any]:
-        """Create enhanced fallback slide content"""
-        event_name = event.get("event_name", "Unknown Event")
-        event_number = event.get("event_number", 0)
-        
-        return {
-            'title': f"{event_name} - Slide {slide_index + 1}",
-            'content': f"Content for {event_name} event. This slide covers key concepts and learning objectives.",
-            'visual_elements': [
-                {'type': 'diagram', 'description': f'Visual representation of {event_name} concepts'},
-                {'type': 'chart', 'description': 'Progress tracking or concept mapping'},
-                {'type': 'image', 'description': 'Relevant educational illustration'}
-            ],
-            'audio_script': f"Welcome to the {event_name} section. Let's explore the key concepts together.",
-            'speaker_notes': f"Present the main points of {event_name}. Engage students with questions and examples.",
-            'udl_guidelines': ['Multiple representation', 'Engagement', 'Action expression'],
-            'accessibility_features': ['alt_text', 'keyboard_navigation', 'high_contrast'],
-            'gagne_event': event_number,
-            'gagne_event_name': event_name,
-            'duration_minutes': event.get('duration_minutes', 10) / total_slides,
-            'slide_number': slide_number,
-            'content_modality': 'mixed'
-        }
+            logger.error(f"Error in _create_slides_for_event: {str(e)}")
+            # Return enhanced fallback slide
+            return [self._create_enhanced_fallback_slide(event, objectives, start_slide_number)]
 
     def _calculate_slide_count(self, duration: int, preference: str) -> int:
-        """Calculate number of slides based on duration and preference"""
+        """Calculate optimal number of slides based on duration and preference"""
+        base_slides = max(1, duration // 5)  # 1 slide per 5 minutes
+        
         if preference == "detailed":
-            return max(2, duration // 5)
-        elif preference == "minimal":
-            return max(1, duration // 15)
+            return min(base_slides * 2, 8)  # More slides, max 8
+        elif preference == "concise":
+            return max(base_slides // 2, 1)  # Fewer slides, min 1
         else:  # balanced
-            return max(1, duration // 10)
+            return min(base_slides, 6)  # Balanced approach, max 6
 
     def _create_slide_object(self, slide_data: Dict, slide_number: int) -> SlideContent:
-        """Create SlideContent object from slide data"""
+        """Convert slide data to SlideContent object"""
         try:
-            # Ensure visual_elements is properly formatted
-            visual_elements = slide_data.get('visual_elements', [])
-            if visual_elements and isinstance(visual_elements[0], str):
-                visual_elements = [{'type': 'element', 'description': elem} for elem in visual_elements]
+            # Ensure all required fields are present with defaults
+            title = slide_data.get("title", f"Slide {slide_number}")
+            main_content = slide_data.get("main_content", "")
+            content_type = slide_data.get("content_type", "mixed")
+            
+            # Validate content_type
+            valid_content_types = ["text", "image", "video", "interactive", "mixed"]
+            if content_type not in valid_content_types:
+                content_type = "mixed"
+            
+            # Handle visual_elements - convert strings to proper format
+            visual_elements_raw = slide_data.get("visual_elements", [])
+            visual_elements = []
+            if isinstance(visual_elements_raw, list):
+                for element in visual_elements_raw:
+                    if isinstance(element, str):
+                        # Convert string to proper format
+                        visual_elements.append({
+                            "type": "image" if element.endswith(('.png', '.jpg', '.jpeg', '.gif')) else "video" if element.endswith(('.mp4', '.avi', '.mov')) else "diagram",
+                            "url": element,
+                            "alt_text": f"Visual element: {element}",
+                            "description": element
+                        })
+                    elif isinstance(element, dict):
+                        visual_elements.append(element)
+                    else:
+                        # Skip invalid elements
+                        continue
+            
+            accessibility_features = slide_data.get("accessibility_features", [])
+            if not isinstance(accessibility_features, list):
+                accessibility_features = ["alt_text", "keyboard_navigation"]
+            
+            udl_guidelines = slide_data.get("udl_guidelines", [])
+            if not isinstance(udl_guidelines, list):
+                udl_guidelines = ["multiple_representation", "engagement"]
+            
+            # Ensure duration is a number
+            duration_minutes = slide_data.get("duration_minutes", 2.0)
+            if not isinstance(duration_minutes, (int, float)):
+                duration_minutes = 2.0
+            
+            # Ensure optional fields
+            audio_script = slide_data.get("audio_script")
+            notes = slide_data.get("notes")
             
             return SlideContent(
                 slide_number=slide_number,
-                title=slide_data.get('title', 'Untitled Slide'),
-                content=slide_data.get('content', ''),
-                gagne_event=slide_data.get('gagne_event', 0),
-                gagne_event_name=slide_data.get('gagne_event_name', 'Unknown'),
-                duration_minutes=slide_data.get('duration_minutes', 5),
-                content_modality=slide_data.get('content_modality', 'mixed'),
+                title=title,
+                content_type=content_type,
+                main_content=main_content,
                 visual_elements=visual_elements,
-                audio_script=slide_data.get('audio_script', ''),
-                speaker_notes=slide_data.get('speaker_notes', ''),
-                udl_guidelines=slide_data.get('udl_guidelines', []),
-                accessibility_features=slide_data.get('accessibility_features', [])
+                audio_script=audio_script,
+                accessibility_features=accessibility_features,
+                udl_guidelines=udl_guidelines,
+                duration_minutes=float(duration_minutes),
+                notes=notes
             )
         except Exception as e:
             logger.error(f"Error creating slide object: {str(e)}")
-            return self._create_enhanced_fallback_slide(event, objectives, slide_number)
+            # Return a basic slide if there's an error
+            return SlideContent(
+                slide_number=slide_number,
+                title=f"Slide {slide_number}",
+                content_type="mixed",
+                main_content="Content for this slide",
+                visual_elements=[],
+                accessibility_features=["alt_text", "keyboard_navigation"],
+                udl_guidelines=["multiple_representation", "engagement"],
+                duration_minutes=2.0
+            )
 
     def _create_enhanced_fallback_slide(self, event: Dict, objectives: List[Dict], slide_number: int) -> SlideContent:
-        """Create enhanced fallback slide"""
-        event_name = event.get("event_name", "Unknown Event")
+        """Create an enhanced fallback slide with more meaningful content"""
+        event_name = event.get("event_name", "Activity")
+        event_number = event.get("event_number", 1)
+        activities = event.get("activities", [])
+        
+        # Create meaningful content based on the event
+        if "attention" in event_name.lower():
+            title = f"Event {event_number}: {event_name}"
+            content = f"Engage students with an attention-grabbing activity related to the lesson topic."
+            guidelines = ["recruiting_interest", "multiple_representation"]
+        elif "objectives" in event_name.lower():
+            title = f"Event {event_number}: {event_name}"
+            content = f"Present clear learning objectives to help students understand what they will learn."
+            guidelines = ["comprehension", "engagement"]
+        elif "recall" in event_name.lower():
+            title = f"Event {event_number}: {event_name}"
+            content = f"Help students connect new learning to their prior knowledge and experiences."
+            guidelines = ["comprehension", "multiple_representation"]
+        elif "present" in event_name.lower():
+            title = f"Event {event_number}: {event_name}"
+            content = f"Present the main content using multiple modalities and clear explanations."
+            guidelines = ["multiple_representation", "comprehension"]
+        elif "guidance" in event_name.lower():
+            title = f"Event {event_number}: {event_name}"
+            content = f"Provide learning guidance and support to help students process information."
+            guidelines = ["comprehension", "action_expression"]
+        elif "elicit" in event_name.lower():
+            title = f"Event {event_number}: {event_name}"
+            content = f"Encourage active participation and practice of the new skills or knowledge."
+            guidelines = ["action_expression", "engagement"]
+        elif "feedback" in event_name.lower():
+            title = f"Event {event_number}: {event_name}"
+            content = f"Provide constructive feedback to help students improve their performance."
+            guidelines = ["engagement", "action_expression"]
+        elif "assess" in event_name.lower():
+            title = f"Event {event_number}: {event_name}"
+            content = f"Assess student understanding and provide opportunities for demonstration."
+            guidelines = ["action_expression", "comprehension"]
+        elif "retention" in event_name.lower():
+            title = f"Event {event_number}: {event_name}"
+            content = f"Help students retain and transfer their learning to new situations."
+            guidelines = ["comprehension", "engagement"]
+        else:
+            title = f"Event {event_number}: {event_name}"
+            content = f"Content for {event_name} - {', '.join(activities) if activities else 'this activity'}"
+            guidelines = ["multiple_representation", "engagement"]
         
         return SlideContent(
             slide_number=slide_number,
-            title=f"{event_name} Content",
-            content=f"Content for {event_name} event with learning objectives and key concepts.",
-            gagne_event=event.get("event_number", 0),
-            gagne_event_name=event_name,
+            title=title,
+            content_type="mixed",
+            main_content=content,
+            visual_elements=[{
+                "type": "image",
+                "url": "placeholder_image.png",
+                "alt_text": f"Visual element for {event_name}",
+                "description": f"Visual representation for {event_name}"
+            }],
+            audio_script=f"Audio narration for {event_name}",
+            accessibility_features=["alt_text", "keyboard_navigation", "screen_reader"],
+            udl_guidelines=guidelines,
             duration_minutes=event.get("duration_minutes", 10),
-            content_modality="mixed",
-            visual_elements=[
-                {'type': 'diagram', 'description': f'Visual representation of {event_name} concepts'},
-                {'type': 'chart', 'description': 'Progress tracking or concept mapping'},
-                {'type': 'image', 'description': 'Relevant educational illustration'}
-            ],
-            audio_script=f"Welcome to the {event_name} section. Let's explore the key concepts together.",
-            speaker_notes=f"Present the main points of {event_name}. Engage students with questions and examples.",
-            udl_guidelines=['Multiple representation', 'Engagement', 'Action expression'],
-            accessibility_features=['alt_text', 'keyboard_navigation', 'high_contrast']
+            notes=f"Speaker notes for {event_name}: {content}"
         )
 
     async def _calculate_udl_compliance(self, slides: List[SlideContent], request: CourseContentRequest) -> UDLComplianceReport:
-        """Calculate UDL compliance for all slides"""
+        """Calculate UDL compliance score and provide recommendations"""
         try:
-            total_slides = len(slides)
-            if total_slides == 0:
-                            return UDLComplianceReport(
-                representation_score=0.0,
-                action_expression_score=0.0,
-                engagement_score=0.0,
-                overall_compliance=0.0,
-                missing_guidelines=[],
-                recommendations=[],
-                accessibility_features_implemented=[]
-            )
-            
-            # Calculate scores for each principle
+            # Analyze representation
             representation_score = self._calculate_principle_score(slides, "representation")
             action_expression_score = self._calculate_principle_score(slides, "action_expression")
             engagement_score = self._calculate_principle_score(slides, "engagement")
             
-            # Calculate overall compliance
             overall_compliance = (representation_score + action_expression_score + engagement_score) / 3
             
             # Identify missing guidelines
@@ -480,9 +450,6 @@ class UDLContentService:
             # Generate recommendations
             recommendations = self._generate_udl_recommendations(slides, missing_guidelines)
             
-            # Extract accessibility features
-            accessibility_features = self._extract_accessibility_features(slides)
-            
             return UDLComplianceReport(
                 representation_score=representation_score,
                 action_expression_score=action_expression_score,
@@ -490,36 +457,44 @@ class UDLContentService:
                 overall_compliance=overall_compliance,
                 missing_guidelines=missing_guidelines,
                 recommendations=recommendations,
-                accessibility_features_implemented=accessibility_features
+                accessibility_features_implemented=self._extract_accessibility_features(slides)
             )
-            
         except Exception as e:
-            logger.error(f"Error calculating UDL compliance: {str(e)}")
+            logger.error(f"Error in _calculate_udl_compliance: {str(e)}")
+            # Return default compliance report
             return UDLComplianceReport(
                 representation_score=0.5,
                 action_expression_score=0.5,
                 engagement_score=0.5,
                 overall_compliance=0.5,
                 missing_guidelines=[],
-                recommendations=["Ensure all UDL principles are properly implemented"],
+                recommendations=["Unable to calculate compliance due to error"],
                 accessibility_features_implemented=[]
             )
 
     def _calculate_principle_score(self, slides: List[SlideContent], principle: str) -> float:
-        """Calculate compliance score for a specific UDL principle"""
+        """Calculate compliance score for a UDL principle"""
         try:
-            total_guidelines = 0
+            if principle not in self.udl_guidelines:
+                logger.warning(f"Principle '{principle}' not found in UDL guidelines")
+                return 0.5
+                
+            principle_data = self.udl_guidelines[principle]
+            if 1 not in principle_data:
+                logger.warning(f"Principle '{principle}' data structure is invalid")
+                return 0.5
+                
+            total_guidelines = len(principle_data[1]["guidelines"])
+            if total_guidelines == 0:
+                logger.warning(f"No guidelines found for principle '{principle}'")
+                return 0.5
+                
             implemented_guidelines = 0
             
             for slide in slides:
-                # Count implemented guidelines for this principle
                 for guideline in slide.udl_guidelines:
-                    if principle.lower() in guideline.lower():
+                    if principle in guideline.lower():
                         implemented_guidelines += 1
-                    total_guidelines += 1
-            
-            if total_guidelines == 0:
-                return 0.5  # Default score if no guidelines found
             
             return min(1.0, implemented_guidelines / total_guidelines)
         except Exception as e:
