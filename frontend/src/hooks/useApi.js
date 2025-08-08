@@ -80,16 +80,12 @@ export function useApi() {
     return executeRequest(() => apiService.generateCourseContent(request));
   }, [executeRequest]);
 
-  const exportToPowerPoint = useCallback(async (courseContent, lessonData) => {
-    return executeRequest(() => apiService.exportCourseContentToPowerPoint(courseContent, lessonData));
+  const exportToPowerPoint = useCallback(async (courseContent, lessonData, designPreferences = {}) => {
+    return executeRequest(() => apiService.exportCourseContentToPowerPoint(courseContent, lessonData, designPreferences));
   }, [executeRequest]);
 
-  const exportToPDF = useCallback(async (courseContent, lessonData) => {
-    return executeRequest(() => apiService.exportCourseContentToPDF(courseContent, lessonData));
-  }, [executeRequest]);
-
-  const exportToHTML = useCallback(async (courseContent, lessonData) => {
-    return executeRequest(() => apiService.exportCourseContentToHTML(courseContent, lessonData));
+  const exportToPDF = useCallback(async (courseContent, lessonData, designPreferences = {}) => {
+    return executeRequest(() => apiService.exportCourseContentToPDF(courseContent, lessonData, designPreferences));
   }, [executeRequest]);
 
   const refineUDLContent = useCallback(async (refinementRequest) => {
@@ -128,7 +124,6 @@ export function useApi() {
     generateCourseContent,
     exportToPowerPoint,
     exportToPDF,
-    exportToHTML,
     refineUDLContent,
     getUDLGuidelines,
     getContentModalities,

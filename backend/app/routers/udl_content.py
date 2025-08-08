@@ -177,39 +177,4 @@ async def export_pdf(
         )
     except Exception as e:
         logger.error(f"PDF export error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to export PDF: {str(e)}")
-
-@router.post("/export/html")
-async def export_html(
-    request: Dict[str, Any],
-    export_service: ExportService = Depends(get_export_service)
-):
-    """Export course content to premium HTML format"""
-    try:
-        logger.info("Starting HTML export")
-        
-        # Extract course content data
-        course_content = request.get("course_content")
-        lesson_data = request.get("lesson_data", {})
-        
-        if not course_content:
-            raise HTTPException(status_code=400, detail="Course content is required")
-        
-        # Generate HTML content
-        html_content = export_service.export_to_html(course_content, lesson_data)
-        
-        # Generate filename
-        lesson_info = lesson_data.get("lesson_info", {})
-        filename = f"{lesson_info.get('course_title', 'Course')}_{lesson_info.get('lesson_topic', 'Lesson')}.html"
-        filename = filename.replace(" ", "_").replace("/", "_")
-        
-        logger.info(f"HTML export completed: {filename}")
-        
-        return StreamingResponse(
-            io.StringIO(html_content),
-            media_type="text/html",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
-        )
-    except Exception as e:
-        logger.error(f"HTML export error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to export HTML: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Failed to export PDF: {str(e)}") 
