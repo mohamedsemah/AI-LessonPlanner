@@ -177,25 +177,15 @@ class PowerPointService {
         valign: 'middle'
       });
       
-      // Main content area - simplified to prevent overflow
+      // Main content area - handle long content properly
       if (slideData.main_content) {
         const cleanContent = this.cleanMarkdown(this.sanitizeText(slideData.main_content));
         if (cleanContent) {
-          // Truncate content more aggressively to prevent overflow
-          const truncatedContent = this.truncateText(cleanContent, 400);
-          
-          slide.addText(truncatedContent, {
-            x: 0.5, y: 1.5, w: 9, h: 4,
-            fontSize: 14,
-            fontFace: 'Segoe UI',
-            color: theme.text,
-            align: 'left',
-            valign: 'top'
-          });
+          this.addContentWithOverflowHandling(slide, cleanContent, theme);
         }
       }
       
-      // Visual elements section - simplified
+      // Visual elements section - positioned below content
       if (slideData.visual_elements && Array.isArray(slideData.visual_elements) && slideData.visual_elements.length > 0) {
         const visualText = 'Visual Elements:\n' + slideData.visual_elements.slice(0, 2).map(element => {
           if (typeof element === 'string') {
@@ -207,7 +197,7 @@ class PowerPointService {
         }).join('\n');
         
         slide.addText(visualText, {
-          x: 0.5, y: 5.5, w: 9, h: 1,
+          x: 0.5, y: 6.2, w: 9, h: 1,
           fontSize: 12,
           fontFace: 'Segoe UI',
           color: theme.secondary,
@@ -216,7 +206,7 @@ class PowerPointService {
         });
       }
       
-      // Slide number
+      // Slide number - positioned at bottom
       slide.addText(`${slideNumber}`, {
         x: 9, y: 6.5, w: 0.8, h: 0.4,
         fontSize: 10,
@@ -295,14 +285,8 @@ class PowerPointService {
       if (slideData.main_content) {
         const cleanContent = this.cleanMarkdown(this.sanitizeText(slideData.main_content));
         if (cleanContent) {
-          slide.addText(cleanContent, {
-            x: 0.5, y: 1.5, w: 9, h: 4,
-            fontSize: 14,
-            fontFace: 'Arial',
-            color: theme.text,
-            align: 'left',
-            valign: 'top'
-          });
+          // Use the same overflow handling method
+          this.addContentWithOverflowHandling(slide, cleanContent, theme);
         }
       }
       
@@ -323,8 +307,20 @@ class PowerPointService {
   truncateText(text, maxLength) {
     if (!text || text.length <= maxLength) return text;
     
-    // Try to truncate at a word boundary
+    // Try to truncate at a sentence boundary first
     const truncated = text.substring(0, maxLength);
+    const lastPeriod = truncated.lastIndexOf('.');
+    const lastExclamation = truncated.lastIndexOf('!');
+    const lastQuestion = truncated.lastIndexOf('?');
+    
+    // Find the last sentence ending
+    const lastSentenceEnd = Math.max(lastPeriod, lastExclamation, lastQuestion);
+    
+    if (lastSentenceEnd > maxLength * 0.7) {
+      return truncated.substring(0, lastSentenceEnd + 1);
+    }
+    
+    // If no good sentence boundary, try word boundary
     const lastSpace = truncated.lastIndexOf(' ');
     
     if (lastSpace > maxLength * 0.8) {
@@ -373,7 +369,7 @@ class PowerPointService {
     return text
       .replace(/[^\x00-\x7F]/g, '') // Remove non-ASCII characters
       .replace(/[<>]/g, '') // Remove potentially problematic characters
-      .substring(0, 500); // Limit length
+      .substring(0, 1000); // Increased length limit for better content preservation
   }
 
   calculateTotalDuration(courseContent) {
@@ -399,6 +395,75 @@ class PowerPointService {
       .replace(/`(.*?)`/g, '$1') // Remove code
       .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Remove links
       .replace(/\n\n/g, '\n') // Remove extra newlines
+      .trim();
+  }
+
+  addContentWithOverflowHandling(slide, content, theme) {
+    // Convert content to bullet points for better spacing
+    const bulletedContent = this.convertToBulletPoints(content);
+    
+    // If content is short, add it as a single text box with bullets
+    if (bulletedContent.length <= 500) {
+      slide.addText(bulletedContent, {
+        x: 0.5, y: 1.5, w: 9, h: 5.5,
+        fontSize: 13,
+        fontFace: 'Segoe UI',
+        color: theme.text,
+        align: 'left',
+        valign: 'top',
+        wrap: true,
+        autoFit: false,
+        margin: 0.4,
+        bullet: { type: 'bullet', level: 0 }
+      });
+      return;
+    }
+    
+    // For longer content, split into multiple text boxes with bullets
+    const maxCharsPerBox = 250;
+    const paragraphs = bulletedContent.split('\n\n');
+    let currentY = 1.5;
+    let boxHeight = 4.5;
+    
+    for (let i = 0; i < paragraphs.length; i++) {
+      const paragraph = paragraphs[i].trim();
+      if (!paragraph) continue;
+      
+      // Add the paragraph as a single text box with bullets
+      slide.addText(paragraph, {
+        x: 0.5, y: currentY, w: 9, h: boxHeight,
+        fontSize: 13,
+        fontFace: 'Segoe UI',
+        color: theme.text,
+        align: 'left',
+        valign: 'top',
+        wrap: true,
+        autoFit: false,
+        margin: 0.3,
+        bullet: { type: 'bullet', level: 0 }
+      });
+      currentY += boxHeight + 1.0; // Increased spacing between boxes
+    }
+  }
+
+  convertToBulletPoints(content) {
+    if (!content) return '';
+    
+    // Split content into sentences and convert to bullet points
+    const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 10);
+    
+    // Convert to bullet points with proper spacing
+    return sentences.map(sentence => `• ${sentence.trim()}`).join('\n\n');
+  }
+
+  formatContentWithSpacing(content) {
+    if (!content) return '';
+    
+    // Add double line breaks between bullet points and sections
+    return content
+      .replace(/\n•/g, '\n\n•')  // Add space before bullet points
+      .replace(/\n-/g, '\n\n-')   // Add space before dash points
+      .replace(/\n\n\n+/g, '\n\n') // Remove excessive line breaks
       .trim();
   }
 }
