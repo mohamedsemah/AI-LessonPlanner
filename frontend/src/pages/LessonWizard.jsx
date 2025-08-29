@@ -25,7 +25,6 @@ const LessonWizard = () => {
     gradeLevel: '',
     duration: '',
     uploadedFiles: [],
-    selectedBloomLevels: [],
     additionalRequirements: ''
   });
   const [formErrors, setFormErrors] = useState({});
@@ -83,6 +82,8 @@ const LessonWizard = () => {
   };
 
   const handleGenerate = async () => {
+    console.log('🚀 handleGenerate called');
+    console.log('📝 formData at start:', formData);
     setIsGenerating(true);
 
     try {
@@ -107,6 +108,8 @@ const LessonWizard = () => {
         })
       );
 
+      console.log('📁 Processed files:', processedFiles.length);
+
       toast.dismiss('file-processing');
       toast.loading('Generating lesson plan with AI...', { id: 'ai-generation' });
 
@@ -115,7 +118,11 @@ const LessonWizard = () => {
         uploadedFiles: processedFiles
       });
       
+      console.log('📤 Lesson request:', lessonRequest);
+      
       const lessonData = await generateLesson(lessonRequest);
+
+      console.log('📥 Lesson data received:', lessonData);
 
       toast.dismiss('ai-generation');
 
@@ -124,10 +131,12 @@ const LessonWizard = () => {
       toast.success(TOAST_MESSAGES.SUCCESS.LESSON_GENERATED);
 
       setTimeout(() => {
+        console.log('🧭 Navigating to results page');
         navigate('/results', { state: { lessonData } });
       }, 1000);
 
     } catch (err) {
+      console.error('❌ Error in handleGenerate:', err);
       toast.dismiss('file-processing');
       toast.dismiss('ai-generation');
       toast.error(TOAST_MESSAGES.ERROR.GENERATION_FAILED);

@@ -1,12 +1,11 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, Clock, Target, Users } from 'lucide-react';
+import { BookOpen, Target, Users } from 'lucide-react';
 
 import Input from '../ui/Input';
 import Select from '../ui/Select';
 import Textarea from '../ui/Textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
-import BloomsTaxonomySelector from './BloomsTaxonomySelector';
 import FileUploadSection from './FileUploadSection';
 import { GRADE_LEVELS } from '../../utils/constants';
 
@@ -17,7 +16,7 @@ const LessonInfoForm = ({ formData, errors, onChange }) => {
   }));
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Basic Information */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -27,65 +26,50 @@ const LessonInfoForm = ({ formData, errors, onChange }) => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-primary-600" />
+              <BookOpen className="w-5 h-5" />
               Basic Lesson Information
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
                 label="Course Title"
-                placeholder="e.g., Introduction to Psychology"
                 value={formData.courseTitle}
                 onChange={(e) => onChange('courseTitle', e.target.value)}
                 error={errors.courseTitle}
-                icon={<BookOpen className="w-4 h-4" />}
+                placeholder="e.g., Introduction to Computer Science"
               />
-
               <Input
                 label="Lesson Topic"
-                placeholder="e.g., Cognitive Development Theories"
                 value={formData.lessonTopic}
                 onChange={(e) => onChange('lessonTopic', e.target.value)}
                 error={errors.lessonTopic}
-                icon={<Target className="w-4 h-4" />}
+                placeholder="e.g., Variables and Data Types"
               />
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Select
                 label="Grade Level"
-                placeholder="Select grade level..."
-                options={gradeOptions}
                 value={formData.gradeLevel}
                 onChange={(e) => onChange('gradeLevel', e.target.value)}
+                options={gradeOptions}
                 error={errors.gradeLevel}
+                placeholder="Select grade level"
               />
-
               <Input
                 label="Duration (minutes)"
-                type="number"
-                placeholder="e.g., 90"
-                min="5"
-                max="480"
                 value={formData.duration}
                 onChange={(e) => onChange('duration', e.target.value)}
                 error={errors.duration}
-                icon={<Clock className="w-4 h-4" />}
-                helper="Enter lesson duration in minutes (5-480)"
+                placeholder="e.g., 45"
+                type="number"
               />
             </div>
-
-            <FileUploadSection
-              uploadedFiles={formData.uploadedFiles || []}
-              onFilesChange={(files) => onChange('uploadedFiles', files)}
-              error={errors.uploadedFiles}
-            />
           </CardContent>
         </Card>
       </motion.div>
 
-      {/* Bloom's Taxonomy Selection */}
+      {/* File Upload Section */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -94,15 +78,15 @@ const LessonInfoForm = ({ formData, errors, onChange }) => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Target className="w-5 h-5 text-primary-600" />
-              Bloom's Taxonomy Levels
+              <Target className="w-5 h-5" />
+              Upload Syllabus and Relevant Materials
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <BloomsTaxonomySelector
-              selectedLevels={formData.selectedBloomLevels}
-              onChange={(levels) => onChange('selectedBloomLevels', levels)}
-              error={errors.selectedBloomLevels}
+            <FileUploadSection
+              uploadedFiles={formData.uploadedFiles}
+              onFilesChange={(files) => onChange('uploadedFiles', files)}
+              error={errors.uploadedFiles}
             />
           </CardContent>
         </Card>
@@ -117,18 +101,17 @@ const LessonInfoForm = ({ formData, errors, onChange }) => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-primary-600" />
-              Additional Requirements (Optional)
+              <Users className="w-5 h-5" />
+              Additional Requirements
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Textarea
-              label="Special Requirements or Considerations"
-              placeholder="e.g., Include group activities, focus on practical applications, accommodate different learning styles..."
-              rows={3}
+              label="Any specific requirements or preferences for this lesson?"
               value={formData.additionalRequirements}
               onChange={(e) => onChange('additionalRequirements', e.target.value)}
-              helper="Any specific requirements, teaching methods, or considerations for this lesson"
+              placeholder="e.g., Include hands-on activities, focus on visual learners, incorporate technology..."
+              rows={3}
             />
           </CardContent>
         </Card>
