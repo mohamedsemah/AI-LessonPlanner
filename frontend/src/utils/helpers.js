@@ -125,7 +125,7 @@ export function formatLessonRequest(formData) {
     lesson_topic: formData.lessonTopic,
     grade_level: formData.gradeLevel,
     duration_minutes: parseInt(formData.duration),
-    preliminary_objectives: formData.preliminaryObjectives,
+    uploaded_files: formData.uploadedFiles || [],
     selected_bloom_levels: formData.selectedBloomLevels,
     additional_requirements: formData.additionalRequirements || null
   };
@@ -207,12 +207,10 @@ export function validateLessonForm(data) {
     errors.duration = 'Duration must be less than 8 hours';
   }
 
-  if (!data.preliminaryObjectives?.trim()) {
-    errors.preliminaryObjectives = 'Preliminary objectives are required';
-  } else if (data.preliminaryObjectives.length < 10) {
-    errors.preliminaryObjectives = 'Please provide more detailed objectives';
-  } else if (data.preliminaryObjectives.length > 1000) {
-    errors.preliminaryObjectives = 'Objectives must be less than 1000 characters';
+  if (!data.uploadedFiles || data.uploadedFiles.length === 0) {
+    errors.uploadedFiles = 'Please upload at least one syllabus or relevant material file';
+  } else if (data.uploadedFiles.length > 5) {
+    errors.uploadedFiles = 'Maximum 5 files allowed';
   }
 
   if (!data.selectedBloomLevels || data.selectedBloomLevels.length === 0) {

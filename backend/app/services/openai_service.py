@@ -5,6 +5,7 @@ from typing import List, Dict, Any
 from openai import AsyncOpenAI
 from ..models.lesson import LessonRequest, LessonResponse, LessonObjective, LessonPlan, GagneEvent, BloomLevel, \
     RefineRequest
+from .file_processing_service import FileProcessingService
 
 
 class OpenAIService:
@@ -14,14 +15,18 @@ class OpenAIService:
     async def generate_lesson_content(self, request: LessonRequest) -> LessonResponse:
         """Generate complete lesson content including objectives, lesson plan, and Gagne events"""
 
-        # Generate objectives and lesson plan concurrently
-        objectives_task = self._generate_objectives(request)
-        lesson_plan_task = self._generate_lesson_plan(request)
+        # Process uploaded files first to extract content
+        file_processor = FileProcessingService()
+        processed_files = await file_processor.process_uploaded_files(request.uploaded_files)
+        
+        # Generate objectives and lesson plan concurrently with file context
+        objectives_task = self._generate_objectives(request, processed_files)
+        lesson_plan_task = self._generate_lesson_plan(request, processed_files)
 
         objectives, lesson_plan = await asyncio.gather(objectives_task, lesson_plan_task)
 
-        # Generate Gagne events with context from objectives and lesson plan
-        gagne_events = await self._generate_gagne_events(request, objectives, lesson_plan)
+        # Generate Gagne events with context from objectives, lesson plan, and uploaded files
+        gagne_events = await self._generate_gagne_events(request, objectives, lesson_plan, processed_files)
 
         return LessonResponse(
             lesson_info={
@@ -29,7 +34,11 @@ class OpenAIService:
                 "lesson_topic": request.lesson_topic,
                 "grade_level": request.grade_level,
                 "duration_minutes": request.duration_minutes,
-                "preliminary_objectives": request.preliminary_objectives,
+                "uploaded_files_info": {
+                    "total_files": len(request.uploaded_files),
+                    "content_length": processed_files["total_content_length"],
+                    "file_types": [f["file_type"] for f in processed_files["file_metadata"]]
+                },
                 "selected_bloom_levels": request.selected_bloom_levels
             },
             objectives=objectives,
@@ -39,7 +48,7 @@ class OpenAIService:
             created_at=str(asyncio.get_event_loop().time())
         )
 
-    async def _generate_objectives(self, request: LessonRequest) -> List[LessonObjective]:
+    async def _generate_objectives(self, request: LessonRequest, processed_files: Dict[str, Any]) -> List[LessonObjective]:
         """Generate detailed learning objectives based on Bloom's taxonomy"""
 
         selected_levels = [level.value for level in request.selected_bloom_levels]
@@ -57,7 +66,14 @@ Course: {request.course_title}
 Topic: {request.lesson_topic}
 Level: {request.grade_level}
 Duration: {request.duration_minutes} minutes
-Preliminary Goals: {request.preliminary_objectives}
+
+UPLOADED MATERIALS CONTEXT:
+{processed_files.get("ai_context", "No additional materials provided")}
+
+IMPORTANT: Use the uploaded materials to understand the course context and student knowledge level. 
+- If this is an early lesson in a course, avoid referencing concepts that haven't been taught yet
+- If specific materials, images, or data are provided, incorporate them appropriately
+- Ensure objectives align with the course progression and prerequisites shown in the materials
 
 PEDAGOGICAL REQUIREMENTS:
 Create exactly {total_objectives} learning objectives following these research-based principles:
@@ -65,7 +81,7 @@ Create exactly {total_objectives} learning objectives following these research-b
 1. COGNITIVE LOAD THEORY: Limit to {total_objectives} objectives for optimal retention
 2. BLOOM'S HIERARCHY: Ensure foundational levels support higher-order thinking
 3. SCAFFOLDING: Build complexity progressively
-4. CONTEXT APPROPRIATENESS: Match cognitive demand to student level
+4. CONTEXT APPROPRIATENESS: Match cognitive demand to student level based on uploaded materials
 
 OBJECTIVE DISTRIBUTION:
 {self._format_distribution_guidance(objectives_distribution, selected_levels)}
@@ -75,6 +91,7 @@ QUALITY STANDARDS:
 - Use appropriate cognitive verbs for each Bloom's level
 - Include realistic conditions and criteria
 - Focus on depth over breadth (Bloom's emphasis on mastery)
+- Ensure objectives are contextually appropriate based on uploaded course materials
 
 COGNITIVE VERBS BY LEVEL:
 - Remember: recall, recognize, identify, define, list, name
@@ -160,231 +177,7 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
             print(f"Using comprehensive fallback")
             return self._create_comprehensive_fallback_objectives(request)
 
-    def _calculate_optimal_objectives_count(self, request: LessonRequest) -> int:
-        """
-        Calculate optimal number of objectives based on Bloom's philosophy and modern research
-
-        Key principles:
-        - Cognitive load theory (Miller's 7±2 rule)
-        - Bloom's hierarchical progression
-        - Quality over quantity
-        - Context-dependent complexity
-        """
-        duration = request.duration_minutes
-        num_levels = len(request.selected_bloom_levels)
-        selected_levels = [level.value for level in request.selected_bloom_levels]
-
-        # Research-based base calculation
-        # Cognitive load theory: 3-5 objectives optimal for retention
-        # Duration factor: Deeper learning needs more time per objective
-        if duration <= 30:
-            base_objectives = 2  # Short sessions: focus deeply
-        elif duration <= 60:
-            base_objectives = 3  # Standard: manageable cognitive load
-        elif duration <= 90:
-            base_objectives = 4  # Extended: can handle more complexity
-        elif duration <= 120:
-            base_objectives = 5  # Long sessions: can handle more
-        else:
-            base_objectives = 6  # Very long sessions: max for cognitive load
-
-        # Bloom's hierarchical complexity adjustment
-        complexity_weight = self._calculate_cognitive_complexity(selected_levels)
-
-        # Higher complexity = fewer objectives (need more time per objective)
-        if complexity_weight > 0.7:  # High complexity (Create, Evaluate dominant)
-            base_objectives = max(2, base_objectives - 1)
-        elif complexity_weight < 0.3:  # Low complexity (Remember, Understand dominant)
-            base_objectives = min(base_objectives + 1, 6)
-
-        # Academic level adjustment (scaffolding principle)
-        level_adjustments = {
-            "freshman": -1,  # Need more time for foundational skills
-            "sophomore": 0,  # Standard
-            "junior": 0,  # Standard
-            "senior": 1,  # Can handle slightly more complexity
-            "masters": 1,  # Graduate-level cognitive capacity
-            "postgrad": 1  # Advanced analytical skills
-        }
-
-        adjustment = level_adjustments.get(request.grade_level, 0)
-        adjusted_objectives = base_objectives + adjustment
-
-        # Pedagogical constraints
-        min_objectives = max(2, min(num_levels, 3))  # At least 2, max 3 for focus
-        max_objectives = 6  # Updated cognitive load limit for longer sessions
-
-        optimal_count = max(min_objectives, min(adjusted_objectives, max_objectives))
-
-        return optimal_count
-
-    def _calculate_cognitive_complexity(self, selected_levels: list) -> float:
-        """
-        Calculate cognitive complexity based on Bloom's hierarchy
-        Returns 0.0 (simple) to 1.0 (complex)
-        """
-        complexity_weights = {
-            "remember": 0.1,
-            "understand": 0.2,
-            "apply": 0.4,
-            "analyze": 0.6,
-            "evaluate": 0.8,
-            "create": 1.0
-        }
-
-        if not selected_levels:
-            return 0.5
-
-        total_weight = sum(complexity_weights.get(level, 0.5) for level in selected_levels)
-        return total_weight / len(selected_levels)
-
-    def _distribute_objectives_pedagogically(self, request: LessonRequest, total_objectives: int) -> dict:
-        """
-        Distribute objectives across Bloom's levels following pedagogical principles
-
-        Principles:
-        - Foundation first (Remember/Understand before higher levels)
-        - Scaffolding (lower levels support higher levels)
-        - Context appropriateness
-        """
-        selected_levels = [level.value for level in request.selected_bloom_levels]
-        distribution = {}
-
-        # Categorize levels by cognitive demand
-        foundational = [l for l in selected_levels if l in ["remember", "understand"]]
-        application = [l for l in selected_levels if l in ["apply", "analyze"]]
-        synthesis = [l for l in selected_levels if l in ["evaluate", "create"]]
-
-        remaining_objectives = total_objectives
-
-        # Bloom's principle: Ensure foundational understanding first
-        if foundational and remaining_objectives > 0:
-            foundation_count = max(1, min(len(foundational), remaining_objectives // 2))
-            for level in foundational:
-                if remaining_objectives > 0:
-                    distribution[level] = 1 if foundation_count == 1 else foundation_count // len(foundational)
-                    remaining_objectives -= distribution[level]
-
-        # Application levels: Bridge between foundation and synthesis
-        if application and remaining_objectives > 0:
-            app_count = max(1, remaining_objectives // 2) if synthesis else remaining_objectives
-            for level in application:
-                if remaining_objectives > 0:
-                    distribution[level] = 1 if len(application) == 1 else max(1, app_count // len(application))
-                    remaining_objectives -= distribution[level]
-
-        # Synthesis levels: Culminating activities
-        if synthesis and remaining_objectives > 0:
-            for level in synthesis:
-                if remaining_objectives > 0:
-                    distribution[level] = 1
-                    remaining_objectives -= 1
-
-        # Distribute any remaining objectives to most appropriate levels
-        priority_order = ["understand", "apply", "analyze", "remember", "evaluate", "create"]
-        for level in priority_order:
-            if level in selected_levels and remaining_objectives > 0:
-                distribution[level] = distribution.get(level, 0) + 1
-                remaining_objectives -= 1
-
-        return distribution
-
-    def _format_distribution_guidance(self, distribution: dict, selected_levels: list) -> str:
-        """Format the distribution guidance for the AI prompt"""
-        guidance_lines = []
-
-        for level in selected_levels:
-            count = distribution.get(level, 0)
-            if count > 0:
-                level_desc = {
-                    "remember": "foundational knowledge",
-                    "understand": "conceptual understanding",
-                    "apply": "practical application",
-                    "analyze": "analytical thinking",
-                    "evaluate": "critical evaluation",
-                    "create": "synthesis and creation"
-                }
-
-                desc = level_desc.get(level, "learning")
-                guidance_lines.append(f"- {count} objective(s) for {level.title()} level ({desc})")
-
-        return "\n".join(guidance_lines)
-
-    def _create_comprehensive_fallback_objectives(self, request: LessonRequest) -> List[LessonObjective]:
-        """Create pedagogically sound fallback objectives"""
-        total_objectives = self._calculate_optimal_objectives_count(request)
-        distribution = self._distribute_objectives_pedagogically(request, total_objectives)
-
-        objectives = []
-
-        # Template objectives following pedagogical principles
-        templates = {
-            "remember": [
-                "Students will be able to recall fundamental concepts of {topic}",
-                "Students will be able to identify key components in {topic}",
-                "Students will be able to define essential terminology for {topic}"
-            ],
-            "understand": [
-                "Students will be able to explain the core principles of {topic}",
-                "Students will be able to interpret the significance of {topic}",
-                "Students will be able to summarize the main ideas in {topic}"
-            ],
-            "apply": [
-                "Students will be able to implement {topic} techniques in practical situations",
-                "Students will be able to demonstrate {topic} procedures accurately",
-                "Students will be able to solve problems using {topic} methods"
-            ],
-            "analyze": [
-                "Students will be able to examine the relationships within {topic}",
-                "Students will be able to compare different approaches to {topic}",
-                "Students will be able to analyze the components of {topic} systems"
-            ],
-            "evaluate": [
-                "Students will be able to assess the effectiveness of {topic} strategies",
-                "Students will be able to critique {topic} methodologies",
-                "Students will be able to justify decisions regarding {topic}"
-            ],
-            "create": [
-                "Students will be able to design innovative {topic} solutions",
-                "Students will be able to develop original {topic} approaches",
-                "Students will be able to construct new {topic} frameworks"
-            ]
-        }
-
-        action_verbs = {
-            "remember": ["recall", "identify", "define"],
-            "understand": ["explain", "interpret", "summarize"],
-            "apply": ["implement", "demonstrate", "solve"],
-            "analyze": ["examine", "compare", "analyze"],
-            "evaluate": ["assess", "critique", "justify"],
-            "create": ["design", "develop", "construct"]
-        }
-
-        # Generate objectives according to pedagogical distribution
-        for level_str, count in distribution.items():
-            level_enum = next((l for l in request.selected_bloom_levels if l.value == level_str), None)
-            if not level_enum:
-                continue
-
-            level_templates = templates.get(level_str, templates["understand"])
-            level_verbs = action_verbs.get(level_str, ["understand"])
-
-            for i in range(count):
-                template = level_templates[i % len(level_templates)]
-                verb = level_verbs[i % len(level_verbs)]
-
-                objectives.append(LessonObjective(
-                    bloom_level=level_enum,
-                    objective=template.format(topic=request.lesson_topic),
-                    action_verb=verb,
-                    content=f"core concepts of {request.lesson_topic}",
-                    condition="following instruction",
-                    criteria="with understanding and accuracy"
-                ))
-
-        return objectives
-
-    async def _generate_lesson_plan(self, request: LessonRequest) -> LessonPlan:
+    async def _generate_lesson_plan(self, request: LessonRequest, processed_files: Dict[str, Any]) -> LessonPlan:
         """Generate a comprehensive lesson plan"""
 
         # Format grade level properly for the prompt
@@ -401,7 +194,13 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
         Create a comprehensive lesson plan for {grade_level_display} students in a course titled "{request.course_title}" 
         for a lesson on "{request.lesson_topic}" lasting {request.duration_minutes} minutes.
 
-        Preliminary objectives: {request.preliminary_objectives}
+        UPLOADED MATERIALS CONTEXT:
+        {processed_files.get("ai_context", "No additional materials provided")}
+
+        IMPORTANT: Use the uploaded materials to understand the course context and student knowledge level.
+        - If this is an early lesson in a course, avoid referencing concepts that haven't been taught yet
+        - If specific materials, images, or data are provided, incorporate them appropriately
+        - Ensure the lesson plan aligns with the course progression and prerequisites shown in the materials
 
         IMPORTANT FORMATTING GUIDELINES:
         - Write the overview in complete, professional sentences
@@ -410,11 +209,12 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
         - Focus on what students will learn and how they will learn it
         - Include the learning approach and key activities
         - DO NOT use template variables like "GradeLevel.MASTERS"
+        - Incorporate relevant content from uploaded materials when appropriate
 
         Generate a detailed lesson plan including:
         1. Clear, engaging lesson overview that describes what students will learn and how
-        2. Prerequisites students should have
-        3. Materials and resources needed
+        2. Prerequisites students should have (based on uploaded materials)
+        3. Materials and resources needed (including any from uploaded files)
         4. Technology requirements
         5. Assessment methods
         6. Differentiation strategies for diverse learners
@@ -603,7 +403,7 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
         return guidance
 
     async def _generate_gagne_events(self, request: LessonRequest, objectives: List[LessonObjective],
-                                     lesson_plan: LessonPlan) -> List[GagneEvent]:
+                                     lesson_plan: LessonPlan, processed_files: Dict[str, Any]) -> List[GagneEvent]:
         """Generate Gagne's Nine Events of Instruction with pedagogically-based time distribution"""
 
         objectives_text = "\n".join([obj.objective for obj in objectives])
@@ -628,10 +428,18 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
         Duration: {request.duration_minutes} minutes
         Focus: {focus_guidance}
 
+        UPLOADED MATERIALS CONTEXT:
+        {processed_files.get("ai_context", "No additional materials provided")}
+
         Learning Objectives:
         {objectives_text}
 
         {time_guidance}
+
+        IMPORTANT: Use the uploaded materials to create contextually appropriate activities.
+        - If this is an early lesson in a course, avoid referencing concepts that haven't been taught yet
+        - If specific materials, images, or data are provided, incorporate them into relevant activities
+        - Ensure activities align with the course progression and prerequisites shown in the materials
 
         PEDAGOGICAL PRINCIPLES:
         - Events 1-4: Information delivery and preparation (~40-50% of time)
@@ -641,7 +449,7 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
         For EACH of the 9 events, provide:
         1. 2-4 specific, detailed activities appropriate for the time allocated
         2. EXACT duration as specified above (non-negotiable)
-        3. Required materials and resources
+        3. Required materials and resources (including any from uploaded files)
         4. Assessment strategy (where applicable)
 
         CONTENT ADAPTATION:
@@ -932,7 +740,7 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
             # Add objective generation if needed
             if objective_change_needed:
                 # Generate new objectives
-                new_objectives = await self._generate_objectives(mock_request)
+                new_objectives = await self._generate_objectives(mock_request, processed_files)
                 objectives_json = json.dumps([{
                     "bloom_level": obj.bloom_level.value,
                     "objective": obj.objective,
@@ -981,6 +789,230 @@ Return ONLY a JSON array with exactly {total_objectives} objectives (use lowerca
         except Exception as e:
             print(f"Error in duration change: {e}")
             return {"refined_content": request.section_content}
+
+    def _calculate_optimal_objectives_count(self, request: LessonRequest) -> int:
+        """
+        Calculate optimal number of objectives based on Bloom's philosophy and modern research
+
+        Key principles:
+        - Cognitive load theory (Miller's 7±2 rule)
+        - Bloom's hierarchical progression
+        - Quality over quantity
+        - Context-dependent complexity
+        """
+        duration = request.duration_minutes
+        num_levels = len(request.selected_bloom_levels)
+        selected_levels = [level.value for level in request.selected_bloom_levels]
+
+        # Research-based base calculation
+        # Cognitive load theory: 3-5 objectives optimal for retention
+        # Duration factor: Deeper learning needs more time per objective
+        if duration <= 30:
+            base_objectives = 2  # Short sessions: focus deeply
+        elif duration <= 60:
+            base_objectives = 3  # Standard: manageable cognitive load
+        elif duration <= 90:
+            base_objectives = 4  # Extended: can handle more complexity
+        elif duration <= 120:
+            base_objectives = 5  # Long sessions: can handle more
+        else:
+            base_objectives = 6  # Very long sessions: max for cognitive load
+
+        # Bloom's hierarchical complexity adjustment
+        complexity_weight = self._calculate_cognitive_complexity(selected_levels)
+
+        # Higher complexity = fewer objectives (need more time per objective)
+        if complexity_weight > 0.7:  # High complexity (Create, Evaluate dominant)
+            base_objectives = max(2, base_objectives - 1)
+        elif complexity_weight < 0.3:  # Low complexity (Remember, Understand dominant)
+            base_objectives = min(base_objectives + 1, 6)
+
+        # Academic level adjustment (scaffolding principle)
+        level_adjustments = {
+            "freshman": -1,  # Need more time for foundational skills
+            "sophomore": 0,  # Standard
+            "junior": 0,  # Standard
+            "senior": 1,  # Can handle slightly more complexity
+            "masters": 1,  # Graduate-level cognitive capacity
+            "postgrad": 1  # Advanced analytical skills
+        }
+
+        adjustment = level_adjustments.get(request.grade_level, 0)
+        adjusted_objectives = base_objectives + adjustment
+
+        # Pedagogical constraints
+        min_objectives = max(2, min(num_levels, 3))  # At least 2, max 3 for focus
+        max_objectives = 6  # Updated cognitive load limit for longer sessions
+
+        optimal_count = max(min_objectives, min(adjusted_objectives, max_objectives))
+
+        return optimal_count
+
+    def _calculate_cognitive_complexity(self, selected_levels: list) -> float:
+        """
+        Calculate cognitive complexity based on Bloom's hierarchy
+        Returns 0.0 (simple) to 1.0 (complex)
+        """
+        complexity_weights = {
+            "remember": 0.1,
+            "understand": 0.2,
+            "apply": 0.4,
+            "analyze": 0.6,
+            "evaluate": 0.8,
+            "create": 1.0
+        }
+
+        if not selected_levels:
+            return 0.5
+
+        total_weight = sum(complexity_weights.get(level, 0.5) for level in selected_levels)
+        return total_weight / len(selected_levels)
+
+    def _distribute_objectives_pedagogically(self, request: LessonRequest, total_objectives: int) -> dict:
+        """
+        Distribute objectives across Bloom's levels following pedagogical principles
+
+        Principles:
+        - Foundation first (Remember/Understand before higher levels)
+        - Scaffolding (lower levels support higher levels)
+        - Context appropriateness
+        """
+        selected_levels = [level.value for level in request.selected_bloom_levels]
+        distribution = {}
+
+        # Categorize levels by cognitive demand
+        foundational = [l for l in selected_levels if l in ["remember", "understand"]]
+        application = [l for l in selected_levels if l in ["apply", "analyze"]]
+        synthesis = [l for l in selected_levels if l in ["evaluate", "create"]]
+
+        remaining_objectives = total_objectives
+
+        # Bloom's principle: Ensure foundational understanding first
+        if foundational and remaining_objectives > 0:
+            foundation_count = max(1, min(len(foundational), remaining_objectives // 2))
+            for level in foundational:
+                if remaining_objectives > 0:
+                    distribution[level] = 1 if foundation_count == 1 else foundation_count // len(foundational)
+                    remaining_objectives -= distribution[level]
+
+        # Application levels: Bridge between foundation and synthesis
+        if application and remaining_objectives > 0:
+            app_count = max(1, remaining_objectives // 2) if synthesis else remaining_objectives
+            for level in application:
+                if remaining_objectives > 0:
+                    distribution[level] = 1 if len(application) == 1 else max(1, app_count // len(application))
+                    remaining_objectives -= distribution[level]
+
+        # Synthesis levels: Culminating activities
+        if synthesis and remaining_objectives > 0:
+            for level in synthesis:
+                if remaining_objectives > 0:
+                    distribution[level] = 1
+                    remaining_objectives -= 1
+
+        # Distribute any remaining objectives to most appropriate levels
+        priority_order = ["understand", "apply", "analyze", "remember", "evaluate", "create"]
+        for level in priority_order:
+            if level in selected_levels and remaining_objectives > 0:
+                distribution[level] = distribution.get(level, 0) + 1
+                remaining_objectives -= 1
+
+        return distribution
+
+    def _format_distribution_guidance(self, distribution: dict, selected_levels: list) -> str:
+        """Format the distribution guidance for the AI prompt"""
+        guidance_lines = []
+
+        for level in selected_levels:
+            count = distribution.get(level, 0)
+            if count > 0:
+                level_desc = {
+                    "remember": "foundational knowledge",
+                    "understand": "conceptual understanding",
+                    "apply": "practical application",
+                    "analyze": "analytical thinking",
+                    "evaluate": "critical evaluation",
+                    "create": "synthesis and creation"
+                }
+
+                desc = level_desc.get(level, "learning")
+                guidance_lines.append(f"- {count} objective(s) for {level.title()} level ({desc})")
+
+        return "\n".join(guidance_lines)
+
+    def _create_comprehensive_fallback_objectives(self, request: LessonRequest) -> List[LessonObjective]:
+        """Create pedagogically sound fallback objectives"""
+        total_objectives = self._calculate_optimal_objectives_count(request)
+        distribution = self._distribute_objectives_pedagogically(request, total_objectives)
+
+        objectives = []
+
+        # Template objectives following pedagogical principles
+        templates = {
+            "remember": [
+                "Students will be able to recall fundamental concepts of {topic}",
+                "Students will be able to identify key components in {topic}",
+                "Students will be able to define essential terminology for {topic}"
+            ],
+            "understand": [
+                "Students will be able to explain the core principles of {topic}",
+                "Students will be able to interpret the significance of {topic}",
+                "Students will be able to summarize the main ideas in {topic}"
+            ],
+            "apply": [
+                "Students will be able to implement {topic} techniques in practical situations",
+                "Students will be able to demonstrate {topic} procedures accurately",
+                "Students will be able to solve problems using {topic} methods"
+            ],
+            "analyze": [
+                "Students will be able to examine the relationships within {topic}",
+                "Students will be able to compare different approaches to {topic}",
+                "Students will be able to analyze the components of {topic} systems"
+            ],
+            "evaluate": [
+                "Students will be able to assess the effectiveness of {topic} strategies",
+                "Students will be able to critique {topic} methodologies",
+                "Students will be able to justify decisions regarding {topic}"
+            ],
+            "create": [
+                "Students will be able to design innovative {topic} solutions",
+                "Students will be able to develop original {topic} approaches",
+                "Students will be able to construct new {topic} frameworks"
+            ]
+        }
+
+        action_verbs = {
+            "remember": ["recall", "identify", "define"],
+            "understand": ["explain", "interpret", "summarize"],
+            "apply": ["implement", "demonstrate", "solve"],
+            "analyze": ["examine", "compare", "analyze"],
+            "evaluate": ["assess", "critique", "justify"],
+            "create": ["design", "develop", "construct"]
+        }
+
+        # Generate objectives according to pedagogical distribution
+        for level_str, count in distribution.items():
+            level_enum = next((l for l in request.selected_bloom_levels if l.value == level_str), None)
+            if not level_enum:
+                continue
+
+            level_templates = templates.get(level_str, templates["understand"])
+            level_verbs = action_verbs.get(level_str, ["understand"])
+
+            for i in range(count):
+                template = level_templates[i % len(level_templates)]
+                verb = level_verbs[i % len(level_verbs)]
+
+                objectives.append(LessonObjective(
+                    bloom_level=level_enum,
+                    objective=template.format(topic=request.lesson_topic),
+                    action_verb=verb,
+                    content=f"core concepts of {request.lesson_topic}",
+                    condition="following instruction",
+                    criteria="with understanding and accuracy"
+                ))
+
+        return objectives
 
     def _create_fallback_lesson_plan(self, request: LessonRequest) -> LessonPlan:
         """Create fallback lesson plan if AI generation fails"""

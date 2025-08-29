@@ -24,7 +24,7 @@ const LessonWizard = () => {
     lessonTopic: '',
     gradeLevel: '',
     duration: '',
-    preliminaryObjectives: '',
+    uploadedFiles: [],
     selectedBloomLevels: [],
     additionalRequirements: ''
   });
@@ -86,8 +86,38 @@ const LessonWizard = () => {
     setIsGenerating(true);
 
     try {
-      const lessonRequest = formatLessonRequest(formData);
+      // Show processing message
+      toast.loading('Processing uploaded files...', { id: 'file-processing' });
+      
+      // Process uploaded files to base64
+      const processedFiles = await Promise.all(
+        formData.uploadedFiles.map(async (file) => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              resolve({
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                content: reader.result
+              });
+            };
+            reader.readAsDataURL(file);
+          });
+        })
+      );
+
+      toast.dismiss('file-processing');
+      toast.loading('Generating lesson plan with AI...', { id: 'ai-generation' });
+
+      const lessonRequest = formatLessonRequest({
+        ...formData,
+        uploadedFiles: processedFiles
+      });
+      
       const lessonData = await generateLesson(lessonRequest);
+
+      toast.dismiss('ai-generation');
 
       // Save to local storage and navigate to results
       saveDraft(lessonData);
@@ -98,6 +128,8 @@ const LessonWizard = () => {
       }, 1000);
 
     } catch (err) {
+      toast.dismiss('file-processing');
+      toast.dismiss('ai-generation');
       toast.error(TOAST_MESSAGES.ERROR.GENERATION_FAILED);
       setCurrentStep(0); // Go back to form
     } finally {

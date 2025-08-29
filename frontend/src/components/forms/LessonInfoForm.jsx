@@ -7,6 +7,7 @@ import Select from '../ui/Select';
 import Textarea from '../ui/Textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import BloomsTaxonomySelector from './BloomsTaxonomySelector';
+import FileUploadSection from './FileUploadSection';
 import { GRADE_LEVELS } from '../../utils/constants';
 
 const LessonInfoForm = ({ formData, errors, onChange }) => {
@@ -75,14 +76,10 @@ const LessonInfoForm = ({ formData, errors, onChange }) => {
               />
             </div>
 
-            <Textarea
-              label="Preliminary Learning Objectives"
-              placeholder="Describe what you want students to learn in this lesson..."
-              rows={4}
-              value={formData.preliminaryObjectives}
-              onChange={(e) => onChange('preliminaryObjectives', e.target.value)}
-              error={errors.preliminaryObjectives}
-              helper="Provide a brief description of your learning goals for this lesson"
+            <FileUploadSection
+              uploadedFiles={formData.uploadedFiles || []}
+              onFilesChange={(files) => onChange('uploadedFiles', files)}
+              error={errors.uploadedFiles}
             />
           </CardContent>
         </Card>

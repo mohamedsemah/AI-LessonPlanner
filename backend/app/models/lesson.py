@@ -45,7 +45,7 @@ class LessonRequest(BaseModel):
     lesson_topic: str = Field(..., min_length=1, max_length=200)
     grade_level: GradeLevel
     duration_minutes: int = Field(..., gt=0, le=480)  # Max 8 hours
-    preliminary_objectives: str = Field(..., min_length=10, max_length=1000)
+    uploaded_files: List[Dict[str, Any]] = Field(..., min_items=1, max_items=5)  # File data from frontend
     selected_bloom_levels: List[BloomLevel] = Field(..., min_items=1)
     additional_requirements: Optional[str] = Field(None, max_length=500)
 
