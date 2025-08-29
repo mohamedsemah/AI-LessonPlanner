@@ -126,7 +126,7 @@ export function formatLessonRequest(formData) {
     grade_level: formData.gradeLevel,
     duration_minutes: parseInt(formData.duration),
     uploaded_files: formData.uploadedFiles || [],
-    selected_bloom_levels: formData.selectedBloomLevels,
+    selected_bloom_levels: ['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'],
     additional_requirements: formData.additionalRequirements || null
   };
 }
@@ -211,10 +211,6 @@ export function validateLessonForm(data) {
     errors.uploadedFiles = 'Please upload at least one syllabus or relevant material file';
   } else if (data.uploadedFiles.length > 5) {
     errors.uploadedFiles = 'Maximum 5 files allowed';
-  }
-
-  if (!data.selectedBloomLevels || data.selectedBloomLevels.length === 0) {
-    errors.selectedBloomLevels = 'Please select at least one Bloom\'s taxonomy level';
   }
 
   return {
