@@ -9,7 +9,7 @@ const Header = () => {
 
   const navigation = [
     { name: 'Home', href: '/', icon: BookOpen },
-    { name: 'Create Lesson', href: '/create', icon: Sparkles },
+    { name: 'Plan & Generate', href: '/create', icon: Sparkles },
   ];
 
   return (
@@ -28,10 +28,10 @@ const Header = () => {
             </motion.div>
             <div className="hidden sm:block">
               <h1 className="text-xl font-bold bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent">
-                AI Lesson Planner
+                AI Lesson Planner & Generator
               </h1>
               <p className="text-xs text-gray-500 -mt-1">
-                Powered by Bloom's & Gagne's
+                Plan Lessons • Generate Content • Powered by Bloom's & Gagne's
               </p>
             </div>
           </Link>

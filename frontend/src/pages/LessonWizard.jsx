@@ -169,11 +169,11 @@ const LessonWizard = () => {
             </motion.div>
 
             <h3 className="text-2xl font-semibold text-gray-900 mb-4">
-              Generating Your Lesson Plan
+              Planning & Generating Your Lesson
             </h3>
 
             <p className="text-gray-600 mb-8 max-w-md mx-auto">
-              Our AI is creating detailed learning objectives, lesson plans, and Gagne's nine events structure based on your requirements.
+              Our AI is creating detailed lesson plans and generating multimodal course content based on your requirements.
             </p>
 
             <div className="space-y-3 text-sm text-gray-500">
@@ -191,7 +191,7 @@ const LessonWizard = () => {
               </div>
               <div className="flex items-center justify-center gap-2">
                 <div className="w-2 h-2 bg-primary-500 rounded-full animate-pulse delay-500" />
-                <span>Finalizing lesson plan</span>
+                <span>Generating course content</span>
               </div>
             </div>
           </div>
@@ -208,10 +208,10 @@ const LessonWizard = () => {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
-            Create Your Lesson Plan
+            Plan & Generate Your Lesson
           </h1>
           <p className="text-lg text-gray-600">
-            Follow the steps below to generate a comprehensive lesson plan
+            Follow the steps below to create a comprehensive lesson plan and generate course content
           </p>
         </div>
 
@@ -257,7 +257,7 @@ const LessonWizard = () => {
                 loading={loading || isGenerating}
                 className="flex items-center gap-2"
               >
-                Generate Lesson Plan
+                Plan & Generate Lesson
                 <ArrowRight className="w-4 h-4" />
               </Button>
             )}

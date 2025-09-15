@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 
 # Create FastAPI application
 app = FastAPI(
-    title="AI Lesson Planning Tool",
-    description="Generate detailed lesson plans using Bloom's Taxonomy and Gagne's Nine Events, plus UDL-compliant multimodal course content",
+    title="AI Lesson Planner & Generator",
+    description="Plan detailed lessons and generate multimodal course content using Bloom's Taxonomy and Gagne's Nine Events, plus UDL-compliant presentations",
     version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -44,15 +44,16 @@ app.include_router(udl_content_router)
 async def root():
     """Root endpoint"""
     return {
-        "message": "AI Lesson Planning Tool API",
+        "message": "AI Lesson Planner & Generator API",
         "version": "2.0.0",
         "docs": "/docs",
         "status": "running",
         "features": [
-            "Lesson plan generation with Bloom's Taxonomy",
+            "Lesson planning with Bloom's Taxonomy",
+            "Course content generation",
             "Gagne's Nine Events integration",
-            "UDL-compliant multimodal course content",
-            "Professional PDF export"
+            "UDL-compliant multimodal presentations",
+            "Professional PDF and PowerPoint export"
         ]
     }
 
@@ -62,7 +63,7 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "service": "lesson-planning-api",
+        "service": "lesson-planner-generator-api",
         "version": "2.0.0"
     }
 
