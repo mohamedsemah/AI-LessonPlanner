@@ -127,8 +127,8 @@ export const WIZARD_STEPS = [
   },
   {
     id: 'generate',
-    title: 'Generate Content',
-    description: 'AI generates your lesson plan and objectives',
+    title: 'Plan & Generate',
+    description: 'AI plans your lesson and generates course content',
     icon: '⚡'
   },
   {
@@ -140,7 +140,7 @@ export const WIZARD_STEPS = [
   {
     id: 'export',
     title: 'Export & Save',
-    description: 'Download your completed lesson plan',
+    description: 'Download your completed lesson plan and presentations',
     icon: '💾'
   }
 ];

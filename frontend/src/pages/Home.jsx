@@ -59,18 +59,18 @@ const Home = () => {
     },
     {
       number: '02',
-      title: 'AI Generation',
-      description: 'Our AI creates detailed objectives, lesson plans, and Gagne\'s nine events structure.'
+      title: 'AI Planning & Generation',
+      description: 'Our AI creates detailed lesson plans and generates multimodal course content with UDL compliance.'
     },
     {
       number: '03',
       title: 'Review & Refine',
-      description: 'Edit and customize the generated content using our rich text editor.'
+      description: 'Edit and customize both lesson plans and presentation content using our rich text editor.'
     },
     {
       number: '04',
       title: 'Export & Use',
-      description: 'Download your professional lesson plan as a formatted PDF document.'
+      description: 'Download professional lesson plans as PDFs and presentations as PowerPoint files.'
     }
   ];
 
@@ -91,13 +91,13 @@ const Home = () => {
                 </span>
                 <br />
                 <span className="text-gray-900">
-                  Lesson Planning
+                  Lesson Planning & Content Generation
                 </span>
               </h1>
 
               <p className="mt-6 max-w-2xl mx-auto text-lg sm:text-xl text-gray-600 leading-relaxed">
-                Generate comprehensive lesson plans using Bloom's Taxonomy and Gagne's Nine Events of Instruction.
-                Perfect for college educators who want to create engaging, pedagogically sound lessons.
+                Plan comprehensive lessons and generate multimodal course content using Bloom's Taxonomy and Gagne's Nine Events.
+                Perfect for educators who want to create engaging, pedagogically sound lessons with ready-to-use presentations.
               </p>
             </motion.div>
 
@@ -109,7 +109,7 @@ const Home = () => {
             >
               <Link to="/create">
                 <Button size="lg" className="w-full sm:w-auto">
-                  Create Your First Lesson
+                  Plan & Generate Your First Lesson
                   <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
               </Link>
@@ -137,7 +137,7 @@ const Home = () => {
               Powerful Features for Modern Educators
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Everything you need to create professional, pedagogically sound lesson plans
+              Everything you need to plan lessons and generate multimodal course content
             </p>
           </motion.div>
 
@@ -186,7 +186,7 @@ const Home = () => {
               How It Works
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Create professional lesson plans in just four simple steps
+              Plan lessons and generate content in just four simple steps
             </p>
           </motion.div>
 
@@ -235,13 +235,13 @@ const Home = () => {
               Ready to Transform Your Teaching?
             </h2>
             <p className="text-xl text-primary-100 mb-8">
-              Join educators who are already creating better lessons with AI assistance
+              Join educators who are already planning better lessons and generating engaging content with AI
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/create">
                 <Button size="lg" variant="secondary" className="w-full sm:w-auto">
-                  Start Creating Now
+                  Start Planning & Generating
                   <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
               </Link>

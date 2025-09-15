@@ -219,7 +219,7 @@ const CourseContent = () => {
                 Course Content Generator
               </h1>
               <p className="mt-2 text-gray-600">
-                Create UDL-compliant multimodal presentations from your lesson plan
+                Generate UDL-compliant multimodal presentations from your lesson plan
               </p>
             </div>
             <Button
