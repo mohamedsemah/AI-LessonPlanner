@@ -73,6 +73,7 @@ class LessonResponse(BaseModel):
     objectives: List[LessonObjective]
     lesson_plan: LessonPlan
     gagne_events: List[GagneEvent]
+    gagne_slides: Optional[Dict[str, Any]] = None  # Slides data for all events
     total_duration: int
     created_at: str
 

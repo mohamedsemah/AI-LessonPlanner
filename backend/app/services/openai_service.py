@@ -6,6 +6,7 @@ from openai import AsyncOpenAI
 from ..models.lesson import LessonRequest, LessonResponse, LessonObjective, LessonPlan, GagneEvent, BloomLevel, \
     RefineRequest
 from .file_processing_service import FileProcessingService
+from .gagne_slide_service import GagneEventSlideService
 
 
 class OpenAIService:
@@ -13,7 +14,7 @@ class OpenAIService:
         self.client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     async def generate_lesson_content(self, request: LessonRequest) -> LessonResponse:
-        """Generate complete lesson content including objectives, lesson plan, and Gagne events"""
+        """Generate complete lesson content including objectives, lesson plan, Gagne events, and slides"""
 
         # Process uploaded files first to extract content (if any)
         file_processor = FileProcessingService()
@@ -28,22 +29,31 @@ class OpenAIService:
         # Generate Gagne events with context from objectives, lesson plan, and uploaded files
         gagne_events = await self._generate_gagne_events(request, objectives, lesson_plan, processed_files)
 
-        return LessonResponse(
-            lesson_info={
-                "course_title": request.course_title,
-                "lesson_topic": request.lesson_topic,
-                "grade_level": request.grade_level,
-                "duration_minutes": request.duration_minutes,
-                "uploaded_files_info": {
-                    "total_files": len(request.uploaded_files) if request.uploaded_files else 0,
-                    "content_length": processed_files["total_content_length"],
-                    "file_types": [f["file_type"] for f in processed_files["file_metadata"]] if processed_files["file_metadata"] else []
-                },
-                "selected_bloom_levels": request.selected_bloom_levels
+        # Generate slides for all Gagne events
+        slide_service = GagneEventSlideService()
+        lesson_info = {
+            "course_title": request.course_title,
+            "lesson_topic": request.lesson_topic,
+            "grade_level": request.grade_level,
+            "duration_minutes": request.duration_minutes,
+            "uploaded_files_info": {
+                "total_files": len(request.uploaded_files) if request.uploaded_files else 0,
+                "content_length": processed_files["total_content_length"],
+                "file_types": [f["file_type"] for f in processed_files["file_metadata"]] if processed_files["file_metadata"] else []
             },
+            "selected_bloom_levels": request.selected_bloom_levels
+        }
+        
+        slides_response = await slide_service.generate_slides_for_all_events(
+            gagne_events, objectives, lesson_plan, lesson_info
+        )
+
+        return LessonResponse(
+            lesson_info=lesson_info,
             objectives=objectives,
             lesson_plan=lesson_plan,
             gagne_events=gagne_events,
+            gagne_slides=slides_response.dict(),
             total_duration=request.duration_minutes,
             created_at=str(asyncio.get_event_loop().time())
         )

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Edit3, BookOpen, Info, Eye } from 'lucide-react';
+import { Edit3, BookOpen, Info, Eye, Presentation } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import Button from '../ui/Button';
 import Badge from '../ui/Badge';
 import { formatDuration } from '../../utils/helpers';
 import LearningObjectivesSlideModal from '../lesson/LearningObjectivesSlideModal';
+import GagneEventSlideModal from '../lesson/GagneEventSlideModal';
 
 const GagneEventsSection = ({
   lessonData,
@@ -17,6 +18,7 @@ const GagneEventsSection = ({
   setShowRedistributionInfo
 }) => {
   const [showSlidePreview, setShowSlidePreview] = useState(false);
+  const [selectedEventSlides, setSelectedEventSlides] = useState(null);
 
   const handleEditSection = (sectionType, content) => {
     if (sectionType === 'gagne_events') {
@@ -25,6 +27,22 @@ const GagneEventsSection = ({
     setEditingSection(sectionType);
     setEditContent(JSON.stringify(content, null, 2));
     setRefinementInstructions('');
+  };
+
+  const handleViewSlides = (event) => {
+    // Check if slides data exists for this event
+    if (lessonData.gagne_slides && lessonData.gagne_slides.events) {
+      const eventSlides = lessonData.gagne_slides.events.find(
+        e => e.event_number === event.event_number
+      );
+      if (eventSlides) {
+        setSelectedEventSlides(eventSlides);
+        return;
+      }
+    }
+    
+    // Fallback: show a message that slides are not available
+    alert('Slides for this event are not available yet. Please regenerate the lesson to include slides.');
   };
 
   return (
@@ -65,18 +83,16 @@ const GagneEventsSection = ({
                       Event {event.event_number}: {event.event_name}
                     </h4>
                     <div className="flex items-center gap-2">
-                      {/* Add Preview Slide button for Event 2 (Inform Learners of Objectives) */}
-                      {event.event_number === 2 && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowSlidePreview(true)}
-                          className="flex items-center gap-2"
-                        >
-                          <Eye className="w-4 h-4" />
-                          Preview Slide
-                        </Button>
-                      )}
+                      {/* View Slides button for all events */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewSlides(event)}
+                        className="flex items-center gap-2"
+                      >
+                        <Presentation className="w-4 h-4" />
+                        View Slides
+                      </Button>
                       <Badge variant="default" size="sm">
                         {formatDuration(event.duration_minutes)}
                       </Badge>
@@ -129,6 +145,13 @@ const GagneEventsSection = ({
         isOpen={showSlidePreview}
         onClose={() => setShowSlidePreview(false)}
         lessonData={lessonData}
+      />
+
+      {/* Gagne Event Slides Modal */}
+      <GagneEventSlideModal
+        isOpen={selectedEventSlides !== null}
+        onClose={() => setSelectedEventSlides(null)}
+        eventSlides={selectedEventSlides}
       />
     </motion.div>
   );
