@@ -53,7 +53,9 @@ const LessonWizard = () => {
 
   const validateCurrentStep = () => {
     if (currentStep === 0) {
+      console.log('🔍 Validating form data:', formData);
       const validation = validateLessonForm(formData);
+      console.log('🔍 Validation result:', validation);
       setFormErrors(validation.errors);
       return validation.isValid;
     }
@@ -87,30 +89,33 @@ const LessonWizard = () => {
     setIsGenerating(true);
 
     try {
-      // Show processing message
-      toast.loading('Processing uploaded files...', { id: 'file-processing' });
-      
-      // Process uploaded files to base64
-      const processedFiles = await Promise.all(
-        formData.uploadedFiles.map(async (file) => {
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              resolve({
-                name: file.name,
-                type: file.type,
-                size: file.size,
-                content: reader.result
-              });
-            };
-            reader.readAsDataURL(file);
-          });
-        })
-      );
+      // Process uploaded files to base64 (if any)
+      let processedFiles = [];
+      if (formData.uploadedFiles && formData.uploadedFiles.length > 0) {
+        toast.loading('Processing uploaded files...', { id: 'file-processing' });
+        
+        processedFiles = await Promise.all(
+          formData.uploadedFiles.map(async (file) => {
+            return new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                resolve({
+                  name: file.name,
+                  type: file.type,
+                  size: file.size,
+                  content: reader.result
+                });
+              };
+              reader.readAsDataURL(file);
+            });
+          })
+        );
 
-      console.log('📁 Processed files:', processedFiles.length);
-
-      toast.dismiss('file-processing');
+        console.log('📁 Processed files:', processedFiles.length);
+        toast.dismiss('file-processing');
+      } else {
+        console.log('📁 No files uploaded - proceeding without file context');
+      }
       toast.loading('Generating lesson plan with AI...', { id: 'ai-generation' });
 
       const lessonRequest = formatLessonRequest({
@@ -119,6 +124,7 @@ const LessonWizard = () => {
       });
       
       console.log('📤 Lesson request:', lessonRequest);
+      console.log('📤 Request JSON:', JSON.stringify(lessonRequest, null, 2));
       
       const lessonData = await generateLesson(lessonRequest);
 

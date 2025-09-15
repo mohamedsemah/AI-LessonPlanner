@@ -1,0 +1,9 @@
+{
+  "course_title": "data structures",
+  "lesson_topic": "queues",
+  "grade_level": "masters",
+  "duration_minutes": 90,
+  "uploaded_files": null,
+  "selected_bloom_levels": ["remember", "understand", "apply", "analyze", "evaluate", "create"],
+  "additional_requirements": null
+}

@@ -15,9 +15,9 @@ class OpenAIService:
     async def generate_lesson_content(self, request: LessonRequest) -> LessonResponse:
         """Generate complete lesson content including objectives, lesson plan, and Gagne events"""
 
-        # Process uploaded files first to extract content
+        # Process uploaded files first to extract content (if any)
         file_processor = FileProcessingService()
-        processed_files = await file_processor.process_uploaded_files(request.uploaded_files)
+        processed_files = await file_processor.process_uploaded_files(request.uploaded_files) if request.uploaded_files else {"ai_context": "No additional materials provided", "total_content_length": 0, "file_metadata": []}
         
         # Generate objectives and lesson plan concurrently with file context
         objectives_task = self._generate_objectives(request, processed_files)
@@ -35,9 +35,9 @@ class OpenAIService:
                 "grade_level": request.grade_level,
                 "duration_minutes": request.duration_minutes,
                 "uploaded_files_info": {
-                    "total_files": len(request.uploaded_files),
+                    "total_files": len(request.uploaded_files) if request.uploaded_files else 0,
                     "content_length": processed_files["total_content_length"],
-                    "file_types": [f["file_type"] for f in processed_files["file_metadata"]]
+                    "file_types": [f["file_type"] for f in processed_files["file_metadata"]] if processed_files["file_metadata"] else []
                 },
                 "selected_bloom_levels": request.selected_bloom_levels
             },

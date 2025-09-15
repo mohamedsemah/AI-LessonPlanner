@@ -92,9 +92,13 @@ class APIService {
    */
   async generateLesson(lessonRequest) {
     try {
+      console.log('🌐 API: Sending request to /api/lesson/generate');
+      console.log('🌐 API: Request data:', JSON.stringify(lessonRequest, null, 2));
       const response = await api.post('/api/lesson/generate', lessonRequest);
+      console.log('🌐 API: Response received:', response.status);
       return response.data;
     } catch (error) {
+      console.error('🌐 API: Error response:', error.response?.status, error.response?.data);
       throw new Error(error.response?.data?.detail || error.message);
     }
   }
