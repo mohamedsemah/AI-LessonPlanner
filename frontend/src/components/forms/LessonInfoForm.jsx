@@ -80,6 +80,7 @@ const LessonInfoForm = ({ formData, errors, onChange }) => {
             <CardTitle className="flex items-center gap-2">
               <Target className="w-5 h-5" />
               Upload Syllabus and Relevant Materials
+              <span className="text-sm font-normal text-gray-500 ml-2">(Optional)</span>
             </CardTitle>
           </CardHeader>
           <CardContent>

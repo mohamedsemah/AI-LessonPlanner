@@ -107,6 +107,7 @@ const FileUploadSection = ({ uploadedFiles, onFilesChange, error }) => {
       <div className="flex items-center justify-between">
         <label className="block text-sm font-medium text-gray-700">
           Upload Syllabus and Relevant Materials
+          <span className="text-sm font-normal text-gray-500 ml-1">(Optional)</span>
         </label>
         <span className="text-xs text-gray-500">
           {uploadedFiles.length}/{MAX_FILES} files
@@ -202,7 +203,7 @@ const FileUploadSection = ({ uploadedFiles, onFilesChange, error }) => {
 
       {/* Helper Text */}
       <p className="text-xs text-gray-500">
-        Upload course syllabus, relevant materials, images, graphs, or datasheets. The AI will analyze these files to create contextually appropriate lesson plans and content.
+        Upload course syllabus, relevant materials, images, graphs, or datasheets to help the AI create more contextually appropriate lesson plans and content. This step is optional but recommended for better results.
       </p>
     </div>
   );

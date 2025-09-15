@@ -125,7 +125,7 @@ export function formatLessonRequest(formData) {
     lesson_topic: formData.lessonTopic,
     grade_level: formData.gradeLevel,
     duration_minutes: parseInt(formData.duration),
-    uploaded_files: formData.uploadedFiles || [],
+    uploaded_files: formData.uploadedFiles && formData.uploadedFiles.length > 0 ? formData.uploadedFiles : null,
     selected_bloom_levels: ['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'],
     additional_requirements: formData.additionalRequirements || null
   };
@@ -207,9 +207,8 @@ export function validateLessonForm(data) {
     errors.duration = 'Duration must be less than 8 hours';
   }
 
-  if (!data.uploadedFiles || data.uploadedFiles.length === 0) {
-    errors.uploadedFiles = 'Please upload at least one syllabus or relevant material file';
-  } else if (data.uploadedFiles.length > 5) {
+  // File upload is now optional - only validate if files are provided
+  if (data.uploadedFiles && data.uploadedFiles.length > 5) {
     errors.uploadedFiles = 'Maximum 5 files allowed';
   }
 
