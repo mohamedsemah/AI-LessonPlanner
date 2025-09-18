@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { 
   X, 
   ChevronLeft, 
@@ -21,6 +23,9 @@ import Button from '../ui/Button';
 import Badge from '../ui/Badge';
 
 const GagneEventSlideModal = ({ isOpen, onClose, eventSlides }) => {
+  // Early return before any hooks to avoid Rules of Hooks violation
+  if (!isOpen || !eventSlides) return null;
+
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
@@ -54,8 +59,6 @@ const GagneEventSlideModal = ({ isOpen, onClose, eventSlides }) => {
       return () => clearInterval(interval);
     }
   }, [isPlaying, eventSlides]);
-
-  if (!isOpen || !eventSlides) return null;
 
   const currentSlide = eventSlides.slides[currentSlideIndex];
   const totalSlides = eventSlides.slides.length;
@@ -152,11 +155,12 @@ const GagneEventSlideModal = ({ isOpen, onClose, eventSlides }) => {
           <div className="max-w-4xl mx-auto">
             {/* Main Content */}
             <div className="prose prose-lg max-w-none mb-6">
-              <div 
-                dangerouslySetInnerHTML={{ 
-                  __html: currentSlide.main_content.replace(/\n/g, '<br/>') 
-                }} 
-              />
+              <ReactMarkdown 
+                remarkPlugins={[remarkGfm]}
+                className="prose-headings:text-gray-900 prose-p:text-gray-700 prose-strong:text-gray-900 prose-ul:text-gray-700 prose-ol:text-gray-700"
+              >
+                {currentSlide.main_content}
+              </ReactMarkdown>
             </div>
 
             {/* Visual Elements */}
@@ -267,7 +271,11 @@ const GagneEventSlideModal = ({ isOpen, onClose, eventSlides }) => {
         {showNotes && currentSlide.speaker_notes && (
           <div className="absolute bottom-0 left-0 right-0 bg-gray-900 text-white p-4 max-h-48 overflow-y-auto">
             <h4 className="font-semibold mb-2">Speaker Notes</h4>
-            <p className="text-sm">{currentSlide.speaker_notes}</p>
+            <div className="text-sm prose prose-invert max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {currentSlide.speaker_notes}
+              </ReactMarkdown>
+            </div>
           </div>
         )}
 
@@ -275,7 +283,11 @@ const GagneEventSlideModal = ({ isOpen, onClose, eventSlides }) => {
         {isAudioPlaying && currentSlide.audio_script && (
           <div className="absolute top-20 right-4 bg-black bg-opacity-75 text-white p-4 rounded-lg max-w-sm">
             <h4 className="font-semibold mb-2">Audio Script</h4>
-            <p className="text-sm">{currentSlide.audio_script}</p>
+            <div className="text-sm prose prose-invert max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {currentSlide.audio_script}
+              </ReactMarkdown>
+            </div>
           </div>
         )}
       </div>
