@@ -12,10 +12,8 @@ import {
   VolumeX,
   Eye,
   Clock,
-  Target,
   BookOpen,
   Users,
-  CheckCircle,
   ArrowLeft,
   ArrowRight
 } from 'lucide-react';
@@ -23,9 +21,6 @@ import Button from '../ui/Button';
 import Badge from '../ui/Badge';
 
 const GagneEventSlideModal = ({ isOpen, onClose, eventSlides }) => {
-  // Early return before any hooks to avoid Rules of Hooks violation
-  if (!isOpen || !eventSlides) return null;
-
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
@@ -34,13 +29,13 @@ const GagneEventSlideModal = ({ isOpen, onClose, eventSlides }) => {
 
   // Reset state when modal opens/closes
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && eventSlides) {
       setCurrentSlideIndex(0);
       setIsPlaying(false);
       setIsAudioPlaying(false);
       setShowNotes(false);
     }
-  }, [isOpen]);
+  }, [isOpen, eventSlides]);
 
   // Auto-play functionality
   useEffect(() => {
@@ -60,8 +55,8 @@ const GagneEventSlideModal = ({ isOpen, onClose, eventSlides }) => {
     }
   }, [isPlaying, eventSlides]);
 
-  const currentSlide = eventSlides.slides[currentSlideIndex];
-  const totalSlides = eventSlides.slides.length;
+  const currentSlide = eventSlides?.slides?.[currentSlideIndex];
+  const totalSlides = eventSlides?.slides?.length || 0;
 
   const handlePreviousSlide = () => {
     setCurrentSlideIndex(prev => Math.max(0, prev - 1));
@@ -125,6 +120,9 @@ const GagneEventSlideModal = ({ isOpen, onClose, eventSlides }) => {
     return () => document.removeEventListener('keydown', handleKeyPress);
   }, [isOpen, currentSlideIndex, totalSlides]);
 
+  // Don't render if not open or no slides data
+  if (!isOpen || !eventSlides) return null;
+
   const renderSlideContent = () => {
     if (!currentSlide) return null;
 
@@ -184,23 +182,6 @@ const GagneEventSlideModal = ({ isOpen, onClose, eventSlides }) => {
               </div>
             )}
 
-            {/* Learning Objectives */}
-            {currentSlide.learning_objectives && currentSlide.learning_objectives.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Target className="w-5 h-5" />
-                  Learning Objectives
-                </h3>
-                <ul className="space-y-2">
-                  {currentSlide.learning_objectives.map((objective, index) => (
-                    <li key={index} className="flex items-start gap-2">
-                      <CheckCircle className="w-4 h-4 text-green-500 mt-1 flex-shrink-0" />
-                      <span className="text-gray-700">{objective}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
 
             {/* Key Points */}
             {currentSlide.key_points && currentSlide.key_points.length > 0 && (
@@ -238,29 +219,7 @@ const GagneEventSlideModal = ({ isOpen, onClose, eventSlides }) => {
               </div>
             )}
 
-            {/* Materials Needed */}
-            {currentSlide.materials_needed && currentSlide.materials_needed.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Materials Needed</h3>
-                <div className="flex flex-wrap gap-2">
-                  {currentSlide.materials_needed.map((material, index) => (
-                    <Badge key={index} variant="secondary" size="sm">
-                      {material}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
 
-            {/* Assessment Criteria */}
-            {currentSlide.assessment_criteria && (
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Assessment Criteria</h3>
-                <p className="text-gray-700 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                  {currentSlide.assessment_criteria}
-                </p>
-              </div>
-            )}
           </div>
         </div>
 
