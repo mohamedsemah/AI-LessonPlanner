@@ -115,15 +115,16 @@ const LearningObjectivesSlideModal = ({ isOpen, onClose, lessonData }) => {
             style={{
               width: '100%',
               maxWidth: '1000px',
-              height: '85vh', // Increased to 85vh
-              minHeight: '750px' // Increased minimum height
+              height: 'auto',
+              minHeight: '600px',
+              maxHeight: '90vh'
             }}
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.3 }}
           >
             {/* Slide Content */}
-            <div className="h-full flex flex-col p-4 relative overflow-hidden">
+            <div className="flex flex-col p-4 relative">
               {/* Background Pattern */}
               <div className="absolute inset-0 opacity-5">
                 <svg className="w-full h-full" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
@@ -147,13 +148,13 @@ const LearningObjectivesSlideModal = ({ isOpen, onClose, lessonData }) => {
               </div>
 
               {/* Learning Objectives Content */}
-              <div className="relative z-10 flex-1 flex flex-col">
+              <div className="relative z-10">
                 <div className="text-center mb-6">
                   <h3 className="text-xl font-semibold text-gray-800">By the end of this lesson, you will be able to:</h3>
                 </div>
 
                 {/* Always use single column layout for better readability */}
-                <div className="space-y-4 flex-1">
+                <div className="space-y-4">
                   {Object.entries(objectivesByLevel).map(([level, levelObjectives], levelIndex) => (
                     <motion.div
                       key={level}
