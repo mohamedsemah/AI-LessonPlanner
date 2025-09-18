@@ -21,6 +21,7 @@ class VisualElementType(str, Enum):
     VIDEO = "video"
     ANIMATION = "animation"
     INTERACTIVE = "interactive"
+    CODE_SNIPPET = "code_snippet"
 
 
 class VisualElement(BaseModel):

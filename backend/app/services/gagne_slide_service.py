@@ -440,7 +440,7 @@ class GagneEventSlideService:
             
         except Exception as e:
             logger.error(f"Error creating slide object: {str(e)}")
-            return self._create_basic_slide(slide_number, event.event_name)
+            return self._create_basic_slide(slide_number, "Unknown Event")
 
     def _create_fallback_slides(
         self, 
