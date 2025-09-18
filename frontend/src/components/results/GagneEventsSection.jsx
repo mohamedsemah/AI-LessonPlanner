@@ -83,16 +83,29 @@ const GagneEventsSection = ({
                       Event {event.event_number}: {event.event_name}
                     </h4>
                     <div className="flex items-center gap-2">
-                      {/* View Slides button for all events */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewSlides(event)}
-                        className="flex items-center gap-2"
-                      >
-                        <Presentation className="w-4 h-4" />
-                        View Slides
-                      </Button>
+                      {/* Special button for Event 2 (Learning Objectives) */}
+                      {event.event_number === 2 ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowSlidePreview(true)}
+                          className="flex items-center gap-2"
+                        >
+                          <BookOpen className="w-4 h-4" />
+                          Preview Objectives
+                        </Button>
+                      ) : (
+                        /* View Slides button for other events */
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewSlides(event)}
+                          className="flex items-center gap-2"
+                        >
+                          <Presentation className="w-4 h-4" />
+                          View Slides
+                        </Button>
+                      )}
                       <Badge variant="default" size="sm">
                         {formatDuration(event.duration_minutes)}
                       </Badge>
