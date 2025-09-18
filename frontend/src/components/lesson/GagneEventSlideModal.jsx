@@ -127,9 +127,9 @@ const GagneEventSlideModal = ({ isOpen, onClose, eventSlides }) => {
     if (!currentSlide) return null;
 
     return (
-      <div className="relative w-full h-full bg-white rounded-lg shadow-lg overflow-hidden">
+      <div className="relative w-full h-full bg-white rounded-lg shadow-lg flex flex-col">
         {/* Slide Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4">
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold">{currentSlide.title}</h2>
@@ -149,8 +149,8 @@ const GagneEventSlideModal = ({ isOpen, onClose, eventSlides }) => {
         </div>
 
         {/* Slide Content */}
-        <div className="p-6 h-full overflow-y-auto">
-          <div className="max-w-4xl mx-auto">
+        <div className="p-6 flex-1 overflow-y-auto">
+          <div className="max-w-4xl mx-auto pb-8">
             {/* Main Content */}
             <div className="prose prose-lg max-w-none mb-6 prose-headings:text-gray-900 prose-p:text-gray-700 prose-strong:text-gray-900 prose-ul:text-gray-700 prose-ol:text-gray-700">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -259,7 +259,7 @@ const GagneEventSlideModal = ({ isOpen, onClose, eventSlides }) => {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ duration: 0.2 }}
-            className={`fixed inset-4 bg-white rounded-lg shadow-2xl overflow-hidden ${
+            className={`fixed inset-4 bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col ${
               showFullscreen ? 'inset-0 rounded-none' : ''
             }`}
           >
@@ -311,9 +311,9 @@ const GagneEventSlideModal = ({ isOpen, onClose, eventSlides }) => {
             </div>
 
             {/* Main Content */}
-            <div className="flex h-full">
+            <div className="flex flex-1 min-h-0">
               {/* Slide Content */}
-              <div className="flex-1 relative">
+              <div className="flex-1 relative overflow-hidden">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={currentSlideIndex}
@@ -321,7 +321,7 @@ const GagneEventSlideModal = ({ isOpen, onClose, eventSlides }) => {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -50 }}
                     transition={{ duration: 0.3 }}
-                    className="h-full"
+                    className="h-full overflow-y-auto"
                   >
                     {renderSlideContent()}
                   </motion.div>
@@ -359,7 +359,7 @@ const GagneEventSlideModal = ({ isOpen, onClose, eventSlides }) => {
               </div>
 
               {/* Slide Thumbnails Sidebar */}
-              <div className="w-64 bg-gray-50 border-l border-gray-200 p-4 overflow-y-auto">
+              <div className="w-64 bg-gray-50 border-l border-gray-200 p-4 overflow-y-auto flex-shrink-0">
                 <h3 className="font-semibold text-gray-900 mb-4">Slides</h3>
                 <div className="space-y-2">
                   {eventSlides.slides.map((slide, index) => (
