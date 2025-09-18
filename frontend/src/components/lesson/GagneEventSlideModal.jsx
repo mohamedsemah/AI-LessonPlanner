@@ -154,11 +154,8 @@ const GagneEventSlideModal = ({ isOpen, onClose, eventSlides }) => {
         <div className="p-6 h-full overflow-y-auto">
           <div className="max-w-4xl mx-auto">
             {/* Main Content */}
-            <div className="prose prose-lg max-w-none mb-6">
-              <ReactMarkdown 
-                remarkPlugins={[remarkGfm]}
-                className="prose-headings:text-gray-900 prose-p:text-gray-700 prose-strong:text-gray-900 prose-ul:text-gray-700 prose-ol:text-gray-700"
-              >
+            <div className="prose prose-lg max-w-none mb-6 prose-headings:text-gray-900 prose-p:text-gray-700 prose-strong:text-gray-900 prose-ul:text-gray-700 prose-ol:text-gray-700">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {currentSlide.main_content}
               </ReactMarkdown>
             </div>
