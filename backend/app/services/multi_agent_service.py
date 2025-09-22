@@ -103,11 +103,17 @@ class MultiAgentService:
             # Extract components from multi-agent result
             lesson_plan_data = data["lesson_plan"]
             content_data = data["content"]
-            udl_data = data["udl_compliance"]
+            udl_compliance_report = data["udl_compliance"]
+            design_compliance_report = data["design_compliance"]
+            accessibility_compliance_report = data["accessibility_compliance"]
+            recommendations = data.get("recommendations", [])
+            design_recommendations = data.get("design_recommendations", [])
+            accessibility_recommendations = data.get("accessibility_recommendations", [])
+            accessibility_features = data.get("accessibility_features", [])
             
             logger.info(f"📊 Lesson plan data keys: {list(lesson_plan_data.keys()) if isinstance(lesson_plan_data, dict) else 'Not a dict'}")
             logger.info(f"📊 Content data keys: {list(content_data.keys()) if isinstance(content_data, dict) else 'Not a dict'}")
-            logger.info(f"📊 UDL data keys: {list(udl_data.keys()) if isinstance(udl_data, dict) else 'Not a dict'}")
+            logger.info(f"📊 UDL data keys: {list(udl_compliance_report.keys()) if isinstance(udl_compliance_report, dict) else 'Not a dict'}")
             
             logger.info("🎨 Creating GagneSlidesResponse...")
             
@@ -153,7 +159,15 @@ class MultiAgentService:
                     gagne_events=gagne_events,
                     gagne_slides=gagne_slides_response.dict(),
                     total_duration=content_data["total_duration"],
-                    created_at=str(asyncio.get_event_loop().time())
+                    created_at=str(asyncio.get_event_loop().time()),
+                    # Multi-agent validation results
+                    udl_compliance=udl_compliance_report,
+                    design_compliance=design_compliance_report,
+                    accessibility_compliance=accessibility_compliance_report,
+                    recommendations=recommendations,
+                    design_recommendations=design_recommendations,
+                    accessibility_recommendations=accessibility_recommendations,
+                    accessibility_features=accessibility_features
                 )
                 logger.info("✅ LessonResponse created successfully")
             except Exception as e:

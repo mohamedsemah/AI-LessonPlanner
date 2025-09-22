@@ -76,6 +76,14 @@ class LessonResponse(BaseModel):
     gagne_slides: Optional[Dict[str, Any]] = None  # Slides data for all events
     total_duration: int
     created_at: str
+    # Multi-agent validation results
+    udl_compliance: Optional[Dict[str, Any]] = None
+    design_compliance: Optional[Dict[str, Any]] = None
+    accessibility_compliance: Optional[Dict[str, Any]] = None
+    recommendations: Optional[List[str]] = None
+    design_recommendations: Optional[List[str]] = None
+    accessibility_recommendations: Optional[List[str]] = None
+    accessibility_features: Optional[List[str]] = None
 
 
 class PDFRequest(BaseModel):
