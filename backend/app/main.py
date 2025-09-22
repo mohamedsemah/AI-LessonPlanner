@@ -49,11 +49,14 @@ async def root():
         "docs": "/docs",
         "status": "running",
         "features": [
-            "Lesson planning with Bloom's Taxonomy",
-            "Course content generation",
-            "Gagne's Nine Events integration",
+            "Multi-agent lesson planning system",
+            "Bloom's Taxonomy integration",
+            "Gagne's Nine Events of Instruction",
             "UDL-compliant multimodal presentations",
-            "Professional PDF and PowerPoint export"
+            "AI-powered content generation",
+            "Professional PDF and PowerPoint export",
+            "Accessibility compliance validation",
+            "Real-time agent coordination"
         ]
     }
 

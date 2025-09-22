@@ -7,6 +7,7 @@ import io
 
 from ..models.lesson import LessonRequest, LessonResponse, RefineRequest, PDFRequest
 from ..services.openai_service import OpenAIService
+from ..services.multi_agent_service import MultiAgentService
 from ..services.pdf_service import PDFService
 
 router = APIRouter(prefix="/api/lesson", tags=["lesson"])
@@ -17,6 +18,10 @@ def get_openai_service() -> OpenAIService:
     return OpenAIService()
 
 
+def get_multi_agent_service() -> MultiAgentService:
+    return MultiAgentService()
+
+
 def get_pdf_service() -> PDFService:
     return PDFService()
 
@@ -24,11 +29,11 @@ def get_pdf_service() -> PDFService:
 @router.post("/generate", response_model=LessonResponse)
 async def generate_lesson(
         request: LessonRequest,
-        openai_service: OpenAIService = Depends(get_openai_service)
+        multi_agent_service: MultiAgentService = Depends(get_multi_agent_service)
 ) -> LessonResponse:
-    """Generate a complete lesson plan with objectives and Gagne events"""
+    """Generate a complete lesson plan with objectives and Gagne events using multi-agent system"""
     try:
-        lesson_response = await openai_service.generate_lesson_content(request)
+        lesson_response = await multi_agent_service.generate_lesson_content(request)
         return lesson_response
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate lesson: {str(e)}")
@@ -37,11 +42,11 @@ async def generate_lesson(
 @router.post("/refine")
 async def refine_content(
         request: RefineRequest,
-        openai_service: OpenAIService = Depends(get_openai_service)
+        multi_agent_service: MultiAgentService = Depends(get_multi_agent_service)
 ) -> Dict[str, Any]:
-    """Refine specific sections of the lesson content"""
+    """Refine specific sections of the lesson content using multi-agent system"""
     try:
-        refined_content = await openai_service.refine_content(request)
+        refined_content = await multi_agent_service.refine_content(request)
         return refined_content
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to refine content: {str(e)}")
@@ -68,6 +73,72 @@ async def export_pdf(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {str(e)}")
+
+
+@router.get("/agents/status")
+async def get_agent_status(
+        multi_agent_service: MultiAgentService = Depends(get_multi_agent_service)
+) -> Dict[str, Any]:
+    """Get status of all agents in the multi-agent system"""
+    try:
+        return multi_agent_service.get_agent_status()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get agent status: {str(e)}")
+
+
+@router.get("/agents/capabilities")
+async def get_system_capabilities(
+        multi_agent_service: MultiAgentService = Depends(get_multi_agent_service)
+) -> Dict[str, Any]:
+    """Get overall system capabilities"""
+    try:
+        return multi_agent_service.get_system_capabilities()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get system capabilities: {str(e)}")
+
+
+@router.get("/udl/guidelines")
+async def get_udl_guidelines(
+        multi_agent_service: MultiAgentService = Depends(get_multi_agent_service)
+) -> Dict[str, Any]:
+    """Get UDL guidelines and implementation strategies"""
+    try:
+        return multi_agent_service.get_udl_guidelines()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get UDL guidelines: {str(e)}")
+
+
+@router.get("/udl/modalities")
+async def get_content_modalities(
+        multi_agent_service: MultiAgentService = Depends(get_multi_agent_service)
+) -> Dict[str, Any]:
+    """Get available content modalities for multimodal learning"""
+    try:
+        return multi_agent_service.get_content_modalities()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get content modalities: {str(e)}")
+
+
+@router.get("/udl/accessibility")
+async def get_accessibility_features(
+        multi_agent_service: MultiAgentService = Depends(get_multi_agent_service)
+) -> Dict[str, Any]:
+    """Get available accessibility features for course content"""
+    try:
+        return multi_agent_service.get_accessibility_features()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get accessibility features: {str(e)}")
+
+
+@router.get("/health/agents")
+async def health_check_agents(
+        multi_agent_service: MultiAgentService = Depends(get_multi_agent_service)
+) -> Dict[str, Any]:
+    """Perform health check on all agents"""
+    try:
+        return await multi_agent_service.health_check()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Health check failed: {str(e)}")
 
 
 @router.get("/bloom-levels")
