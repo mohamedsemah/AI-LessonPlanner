@@ -6,7 +6,7 @@ This module contains the core agents responsible for different aspects of lesson
 - ContentAgent: Creates teaching slides and multimodal content
 - UDLAgent: Validates Universal Design for Learning compliance
 - DesignAgent: Validates C.R.A.P. design principles (Contrast, Repetition, Alignment, Proximity)
-- AccessibilityAgent: Validates technical accessibility compliance (WCAG standards)
+- AccessibilityAgent: Validates technical accessibility compliance (WCAG 2.2 standards)
 - CoordinatorAgent: Orchestrates all agents in the lesson generation process
 
 The agents work together to create comprehensive, pedagogically sound lesson plans

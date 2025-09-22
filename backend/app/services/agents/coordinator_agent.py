@@ -779,7 +779,7 @@ class CoordinatorAgent(BaseAgent):
             "accessibility_agent": {
                 "status": "active",
                 "version": "1.0.0",
-                "capabilities": ["wcag_validation", "technical_accessibility", "compliance_scoring"]
+                "capabilities": ["wcag_2_2_validation", "technical_accessibility", "compliance_scoring", "mobile_accessibility"]
             }
         }
     

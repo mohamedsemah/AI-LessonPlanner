@@ -13,10 +13,12 @@ class AccessibilityAgent(BaseAgent):
     Validates technical accessibility compliance for:
     - Screen reader compatibility
     - Keyboard navigation
-    - Color contrast (WCAG standards)
+    - Color contrast (WCAG 2.2 standards)
     - Alt text for images
     - Focus management
     - Semantic structure
+    - Mobile accessibility
+    - Target size requirements
     """
     
     def __init__(self, client: AsyncOpenAI):
@@ -26,7 +28,7 @@ class AccessibilityAgent(BaseAgent):
         self.wcag_guidelines = self._initialize_wcag_guidelines()
     
     def _initialize_wcag_guidelines(self) -> Dict[str, Any]:
-        """Initialize WCAG 2.1 accessibility guidelines."""
+        """Initialize WCAG 2.2 accessibility guidelines."""
         return {
             "perceivable": {
                 "color_contrast": {
@@ -63,7 +65,7 @@ class AccessibilityAgent(BaseAgent):
         Args:
             input_data: Dictionary containing:
                 - slides: List of SlideContent objects or dictionaries
-                - accessibility_level: "A", "AA", "AAA" (WCAG compliance level)
+                - accessibility_level: "A", "AA", "AAA" (WCAG 2.2 compliance level)
                 - validation_preferences: Optional validation preferences
                 
         Returns:
@@ -119,7 +121,7 @@ class AccessibilityAgent(BaseAgent):
             return self._create_error_response(e)
     
     async def _validate_wcag_compliance(self, slides: List[Dict[str, Any]], accessibility_level: str) -> Dict[str, Any]:
-        """Validate slides against WCAG compliance."""
+        """Validate slides against WCAG 2.2 compliance."""
         try:
             perceivable_score = await self._validate_perceivable(slides, accessibility_level)
             operable_score = await self._validate_operable(slides, accessibility_level)
@@ -436,7 +438,7 @@ class AccessibilityAgent(BaseAgent):
         return violations
     
     def get_wcag_guidelines(self) -> Dict[str, Any]:
-        """Get WCAG accessibility guidelines."""
+        """Get WCAG 2.2 accessibility guidelines."""
         return self.wcag_guidelines
     
     def get_accessibility_recommendations(self) -> List[str]:
@@ -451,5 +453,8 @@ class AccessibilityAgent(BaseAgent):
             "Provide text alternatives for audio and video content",
             "Use clear, descriptive labels for all form elements",
             "Ensure content is readable and understandable",
-            "Avoid content that flashes more than 3 times per second"
+            "Avoid content that flashes more than 3 times per second",
+            "Follow WCAG 2.2 guidelines for latest accessibility standards",
+            "Ensure target sizes meet minimum requirements (24x24px)",
+            "Implement focus management for better keyboard navigation"
         ]
