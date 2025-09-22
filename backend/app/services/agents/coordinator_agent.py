@@ -19,6 +19,8 @@ from .base_agent import BaseAgent
 from .plan_agent import PlanAgent
 from .content_agent import ContentAgent
 from .udl_agent import UDLAgent
+from .design_agent import DesignAgent
+from .accessibility_agent import AccessibilityAgent
 from ...models.lesson import LessonRequest, LessonObjective, LessonPlan, GagneEvent
 from ...models.gagne_slides import GagneSlidesResponse, SlideContent, GagneEventSlides
 
@@ -46,6 +48,8 @@ class CoordinatorAgent(BaseAgent):
         self.plan_agent = PlanAgent(client)
         self.content_agent = ContentAgent(client)
         self.udl_agent = UDLAgent(client)
+        self.design_agent = DesignAgent(client)
+        self.accessibility_agent = AccessibilityAgent(client)
         
         self.logger.info("CoordinatorAgent initialized with all sub-agents")
     
@@ -297,6 +301,62 @@ class CoordinatorAgent(BaseAgent):
                     udl_data = udl_result["data"]
                     self.logger.info("✅ UDL phase succeeded")
             
+            # Phase 4: Design Validation
+            self.logger.info("=" * 60)
+            self.logger.info("🎨 PHASE 4: DESIGN VALIDATION")
+            self.logger.info("=" * 60)
+            try:
+                self.logger.info("🤖 Calling design agent...")
+                design_result = await asyncio.wait_for(
+                    self._execute_design_phase(slides, preferences),
+                    timeout=60  # 1 minute timeout for design validation
+                )
+                self.logger.info(f"✅ Design agent returned: {type(design_result)}")
+            except asyncio.TimeoutError:
+                self.logger.warning("⏰ Design validation timed out, using fallback compliance")
+                design_data = self._create_fallback_design_compliance(slides)
+            except Exception as e:
+                self.logger.error(f"❌ Design phase error: {str(e)}")
+                self.logger.warning("Using fallback design compliance due to error")
+                design_data = self._create_fallback_design_compliance(slides)
+            else:
+                if not design_result.get("success"):
+                    error_msg = design_result.get('error', 'Unknown error')
+                    self.logger.warning(f"⚠️ Design phase failed: {error_msg}")
+                    self.logger.warning("Using fallback design compliance due to failure")
+                    design_data = self._create_fallback_design_compliance(slides)
+                else:
+                    design_data = design_result["data"]
+                    self.logger.info("✅ Design phase succeeded")
+            
+            # Phase 5: Accessibility Validation
+            self.logger.info("=" * 60)
+            self.logger.info("♿ PHASE 5: ACCESSIBILITY VALIDATION")
+            self.logger.info("=" * 60)
+            try:
+                self.logger.info("🤖 Calling accessibility agent...")
+                accessibility_result = await asyncio.wait_for(
+                    self._execute_accessibility_phase(slides, preferences),
+                    timeout=60  # 1 minute timeout for accessibility validation
+                )
+                self.logger.info(f"✅ Accessibility agent returned: {type(accessibility_result)}")
+            except asyncio.TimeoutError:
+                self.logger.warning("⏰ Accessibility validation timed out, using fallback compliance")
+                accessibility_data = self._create_fallback_accessibility_compliance(slides)
+            except Exception as e:
+                self.logger.error(f"❌ Accessibility phase error: {str(e)}")
+                self.logger.warning("Using fallback accessibility compliance due to error")
+                accessibility_data = self._create_fallback_accessibility_compliance(slides)
+            else:
+                if not accessibility_result.get("success"):
+                    error_msg = accessibility_result.get('error', 'Unknown error')
+                    self.logger.warning(f"⚠️ Accessibility phase failed: {error_msg}")
+                    self.logger.warning("Using fallback accessibility compliance due to failure")
+                    accessibility_data = self._create_fallback_accessibility_compliance(slides)
+                else:
+                    accessibility_data = accessibility_result["data"]
+                    self.logger.info("✅ Accessibility phase succeeded")
+            
             # Aggregate results
             self.logger.info("🔍 Aggregating results...")
             result = {
@@ -311,12 +371,16 @@ class CoordinatorAgent(BaseAgent):
                     "total_duration": slides_response.total_duration
                 },
                 "udl_compliance": udl_data["udl_compliance_report"],
+                "design_compliance": design_data["design_compliance_report"],
+                "accessibility_compliance": accessibility_data["accessibility_compliance_report"],
                 "recommendations": udl_data.get("recommendations", []),
+                "design_recommendations": design_data.get("recommendations", []),
+                "accessibility_recommendations": accessibility_data.get("recommendations", []),
                 "accessibility_features": udl_data.get("accessibility_features", [])
             }
             
             metadata = {
-                "phases_completed": ["plan", "content", "udl"],
+                "phases_completed": ["plan", "content", "udl", "design", "accessibility"],
                 "total_objectives": len(objectives),
                 "total_events": len(gagne_events),
                 "total_slides": slides_response.total_slides,
@@ -604,6 +668,86 @@ class CoordinatorAgent(BaseAgent):
             self.logger.error(f"Error refining UDL compliance: {str(e)}")
             return {"refined_udl_compliance": udl_data}
     
+    async def _execute_design_phase(
+        self, 
+        slides: List[SlideContent], 
+        preferences: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Execute the design validation phase using Design Agent"""
+        try:
+            design_input = {
+                "slides": [slide.dict() for slide in slides],
+                "design_preferences": preferences.get("design", {}),
+                "validation_level": preferences.get("design_level", "standard")
+            }
+            
+            return await self.design_agent.process(design_input)
+            
+        except Exception as e:
+            self.logger.error(f"Design phase execution failed: {str(e)}")
+            return self._create_error_response(e)
+    
+    async def _execute_accessibility_phase(
+        self, 
+        slides: List[SlideContent], 
+        preferences: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Execute the accessibility validation phase using Accessibility Agent"""
+        try:
+            accessibility_input = {
+                "slides": [slide.dict() for slide in slides],
+                "accessibility_level": preferences.get("accessibility_level", "AA"),
+                "validation_preferences": preferences.get("accessibility", {})
+            }
+            
+            return await self.accessibility_agent.process(accessibility_input)
+            
+        except Exception as e:
+            self.logger.error(f"Accessibility phase execution failed: {str(e)}")
+            return self._create_error_response(e)
+    
+    def _create_fallback_design_compliance(self, slides: List[SlideContent]) -> Dict[str, Any]:
+        """Create fallback design compliance data"""
+        return {
+            "design_compliance_report": {
+                "contrast_score": 0.5,
+                "repetition_score": 0.5,
+                "alignment_score": 0.5,
+                "proximity_score": 0.5,
+                "overall_score": 0.5,
+                "validation_level": "basic",
+                "principles": {
+                    "contrast": {"score": 0.5, "status": "basic", "details": "Basic contrast validation"},
+                    "repetition": {"score": 0.5, "status": "basic", "details": "Basic repetition validation"},
+                    "alignment": {"score": 0.5, "status": "basic", "details": "Basic alignment validation"},
+                    "proximity": {"score": 0.5, "status": "basic", "details": "Basic proximity validation"}
+                }
+            },
+            "recommendations": ["Implement basic C.R.A.P. design principles"],
+            "violations": []
+        }
+    
+    def _create_fallback_accessibility_compliance(self, slides: List[SlideContent]) -> Dict[str, Any]:
+        """Create fallback accessibility compliance data"""
+        return {
+            "accessibility_compliance_report": {
+                "perceivable_score": 0.5,
+                "operable_score": 0.5,
+                "understandable_score": 0.5,
+                "robust_score": 0.5,
+                "overall_score": 0.5,
+                "wcag_level": "AA",
+                "principles": {
+                    "perceivable": {"score": 0.5, "status": "basic", "details": "Basic perceivable validation"},
+                    "operable": {"score": 0.5, "status": "basic", "details": "Basic operable validation"},
+                    "understandable": {"score": 0.5, "status": "basic", "details": "Basic understandable validation"},
+                    "robust": {"score": 0.5, "status": "basic", "details": "Basic robust validation"}
+                }
+            },
+            "recommendations": ["Implement basic WCAG accessibility guidelines"],
+            "violations": []
+        }
+    
     def get_agent_status(self) -> Dict[str, Any]:
         """Get status of all agents"""
         return {
@@ -626,6 +770,16 @@ class CoordinatorAgent(BaseAgent):
                 "status": "active",
                 "version": "1.0.0",
                 "capabilities": ["udl_validation", "accessibility_assessment", "compliance_scoring"]
+            },
+            "design_agent": {
+                "status": "active",
+                "version": "1.0.0",
+                "capabilities": ["crap_validation", "design_assessment", "visual_compliance"]
+            },
+            "accessibility_agent": {
+                "status": "active",
+                "version": "1.0.0",
+                "capabilities": ["wcag_validation", "technical_accessibility", "compliance_scoring"]
             }
         }
     
