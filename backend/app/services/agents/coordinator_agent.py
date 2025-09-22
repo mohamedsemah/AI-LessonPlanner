@@ -15,12 +15,12 @@ comprehensive, pedagogically sound, and accessible lesson plans.
 import asyncio
 import logging
 from typing import Dict, Any, List, Optional
-from ..base_agent import BaseAgent
+from .base_agent import BaseAgent
 from .plan_agent import PlanAgent
 from .content_agent import ContentAgent
 from .udl_agent import UDLAgent
 from ...models.lesson import LessonRequest, LessonObjective, LessonPlan, GagneEvent
-from ...models.gagne_slides import GagneSlidesResponse, SlideContent
+from ...models.gagne_slides import GagneSlidesResponse, SlideContent, GagneEventSlides
 
 logger = logging.getLogger(__name__)
 
@@ -67,9 +67,17 @@ class CoordinatorAgent(BaseAgent):
                 - metadata: Processing metadata
         """
         try:
+            self.logger.info("=" * 80)
+            self.logger.info("🎯 COORDINATOR AGENT STARTING")
+            self.logger.info("=" * 80)
+            
             lesson_request = input_data.get("lesson_request")
             processed_files = input_data.get("processed_files", {})
             preferences = input_data.get("preferences", {})
+            
+            self.logger.info(f"📋 Input data keys: {list(input_data.keys())}")
+            self.logger.info(f"📁 Processed files: {len(processed_files)} files")
+            self.logger.info(f"⚙️ Preferences: {preferences}")
             
             if not lesson_request:
                 raise ValueError("lesson_request is required")
@@ -77,45 +85,220 @@ class CoordinatorAgent(BaseAgent):
             self._log_processing_start(f"Orchestrating lesson planning for: {lesson_request.course_title}")
             
             # Phase 1: Plan Generation
-            self.logger.info("Phase 1: Generating lesson plan components")
-            plan_result = await self._execute_plan_phase(lesson_request, processed_files)
+            self.logger.info("=" * 60)
+            self.logger.info("📋 PHASE 1: PLAN GENERATION")
+            self.logger.info("=" * 60)
+            try:
+                self.logger.info("🤖 Calling plan agent...")
+                plan_result = await asyncio.wait_for(
+                    self._execute_plan_phase(lesson_request, processed_files),
+                    timeout=120  # 2 minute timeout for plan generation
+                )
+                self.logger.info(f"✅ Plan agent returned: {type(plan_result)}")
+                self.logger.info(f"📊 Plan result keys: {plan_result.keys() if isinstance(plan_result, dict) else 'Not a dict'}")
+            except asyncio.TimeoutError:
+                self.logger.error("⏰ Plan generation timed out")
+                raise Exception("Plan generation timed out. Please try again.")
+            except Exception as e:
+                self.logger.error(f"❌ Plan phase error: {str(e)}")
+                import traceback
+                self.logger.error(f"📜 Traceback: {traceback.format_exc()}")
+                raise
             
             if not plan_result.get("success"):
-                raise Exception(f"Plan phase failed: {plan_result.get('error', 'Unknown error')}")
+                error_msg = plan_result.get('error', 'Unknown error')
+                self.logger.error(f"❌ Plan phase failed: {error_msg}")
+                raise Exception(f"Plan phase failed: {error_msg}")
             
             plan_data = plan_result["data"]
-            objectives = [LessonObjective(**obj) for obj in plan_data["objectives"]]
-            lesson_plan = LessonPlan(**plan_data["lesson_plan"])
-            gagne_events = [GagneEvent(**event) for event in plan_data["gagne_events"]]
+            self.logger.info(f"✅ Plan phase completed: {len(plan_data['objectives'])} objectives, {len(plan_data['gagne_events'])} events")
+            
+            try:
+                self.logger.info("🔍 Creating plan objects...")
+                objectives = [LessonObjective(**obj) for obj in plan_data["objectives"]]
+                self.logger.info(f"✅ Created {len(objectives)} objectives")
+                
+                lesson_plan = LessonPlan(**plan_data["lesson_plan"])
+                self.logger.info("✅ Created lesson plan")
+                
+                gagne_events = [GagneEvent(**event) for event in plan_data["gagne_events"]]
+                self.logger.info(f"✅ Created {len(gagne_events)} Gagne events")
+            except Exception as e:
+                self.logger.error(f"❌ Error creating plan objects: {str(e)}")
+                import traceback
+                self.logger.error(f"📜 Traceback: {traceback.format_exc()}")
+                raise Exception(f"Failed to create plan objects: {str(e)}")
             
             # Phase 2: Content Generation
-            self.logger.info("Phase 2: Generating teaching content")
-            content_result = await self._execute_content_phase(
-                gagne_events, objectives, lesson_plan, lesson_request, processed_files
-            )
-            
-            if not content_result.get("success"):
-                self.logger.warning(f"Content phase failed: {content_result.get('error', 'Unknown error')}")
-                # Continue with fallback content
+            self.logger.info("=" * 60)
+            self.logger.info("🎨 PHASE 2: CONTENT GENERATION")
+            self.logger.info("=" * 60)
+            try:
+                self.logger.info("🤖 Calling content agent...")
+                content_result = await asyncio.wait_for(
+                    self._execute_content_phase(
+                        gagne_events, objectives, lesson_plan, lesson_request, processed_files
+                    ),
+                    timeout=120  # 2 minute timeout for content generation
+                )
+                self.logger.info(f"✅ Content agent returned: {type(content_result)}")
+                self.logger.info(f"📊 Content result keys: {content_result.keys() if isinstance(content_result, dict) else 'Not a dict'}")
+            except asyncio.TimeoutError:
+                self.logger.warning("⏰ Content generation timed out, using fallback content")
+                content_data = self._create_fallback_content(gagne_events, objectives, lesson_plan)
+            except Exception as e:
+                self.logger.error(f"❌ Content phase error: {str(e)}")
+                import traceback
+                self.logger.error(f"📜 Traceback: {traceback.format_exc()}")
+                self.logger.warning("Using fallback content due to error")
                 content_data = self._create_fallback_content(gagne_events, objectives, lesson_plan)
             else:
-                content_data = content_result["data"]
+                if not content_result.get("success"):
+                    error_msg = content_result.get('error', 'Unknown error')
+                    self.logger.warning(f"⚠️ Content phase failed: {error_msg}")
+                    self.logger.warning("Using fallback content due to failure")
+                    content_data = self._create_fallback_content(gagne_events, objectives, lesson_plan)
+                else:
+                    content_data = content_result["data"]
+                    self.logger.info("✅ Content phase succeeded")
             
-            slides_response = GagneSlidesResponse(**content_data["gagne_slides_response"])
-            slides = [SlideContent(**slide) for event in slides_response.events for slide in event.slides]
+            try:
+                self.logger.info("🔍 Processing content data...")
+                self.logger.info(f"📊 Content data keys: {list(content_data.keys()) if isinstance(content_data, dict) else 'Not a dict'}")
+                
+                # The content_data["gagne_slides_response"] is a dictionary from .dict() call
+                # We need to reconstruct the GagneSlidesResponse properly
+                gagne_slides_data = content_data["gagne_slides_response"]
+                self.logger.info(f"🔍 Gagne slides data type: {type(gagne_slides_data)}")
+                self.logger.info(f"📊 Gagne slides data keys: {list(gagne_slides_data.keys()) if isinstance(gagne_slides_data, dict) else 'Not a dict'}")
+                
+                # Reconstruct events with proper SlideContent objects
+                reconstructed_events = []
+                self.logger.info(f"🔍 Processing {len(gagne_slides_data['events'])} events...")
+                
+                for i, event_data in enumerate(gagne_slides_data["events"]):
+                    self.logger.info(f"🔍 Processing event {i+1}: {event_data.get('event_name', 'Unknown')}")
+                    self.logger.info(f"📊 Event data keys: {list(event_data.keys()) if isinstance(event_data, dict) else 'Not a dict'}")
+                    
+                    # Convert slide dictionaries back to SlideContent objects
+                    slide_objects = []
+                    slides_data = event_data.get("slides", [])
+                    self.logger.info(f"🔍 Processing {len(slides_data)} slides for event {i+1}")
+                    
+                    for j, slide_data in enumerate(slides_data):
+                        self.logger.info(f"🔍 Processing slide {j+1} of event {i+1}")
+                        self.logger.info(f"📊 Slide data type: {type(slide_data)}")
+                        self.logger.info(f"📊 Slide data keys: {list(slide_data.keys()) if isinstance(slide_data, dict) else 'Not a dict'}")
+                        
+                        if isinstance(slide_data, SlideContent):
+                            # slide_data is already a SlideContent object
+                            self.logger.info("✅ slide_data is already SlideContent, using directly")
+                            slide_objects.append(slide_data)
+                        elif isinstance(slide_data, dict):
+                            # slide_data is a dictionary, convert to SlideContent
+                            self.logger.info("🔄 slide_data is dict, converting to SlideContent")
+                            try:
+                                slide_obj = SlideContent(**slide_data)
+                                slide_objects.append(slide_obj)
+                                self.logger.info(f"✅ Successfully created SlideContent for slide {j+1}")
+                            except Exception as e:
+                                self.logger.error(f"❌ Error creating SlideContent from dict: {str(e)}")
+                                self.logger.error(f"🔍 Error type: {type(e).__name__}")
+                                self.logger.error(f"📊 slide_data keys: {slide_data.keys() if isinstance(slide_data, dict) else 'Not a dict'}")
+                                self.logger.error(f"📊 slide_data sample: {str(slide_data)[:200]}...")
+                                import traceback
+                                self.logger.error(f"📜 Traceback: {traceback.format_exc()}")
+                                raise
+                        else:
+                            self.logger.error(f"❌ Unexpected slide_data type: {type(slide_data)}")
+                            self.logger.error(f"📊 slide_data value: {slide_data}")
+                            raise Exception(f"Unexpected slide_data type: {type(slide_data)}")
+                    
+                    self.logger.info(f"✅ Created {len(slide_objects)} slides for event {i+1}")
+                    
+                    # Create GagneEventSlides with proper SlideContent objects
+                    try:
+                        event_slides = GagneEventSlides(
+                            event_number=event_data["event_number"],
+                            event_name=event_data["event_name"],
+                            event_description=event_data["event_description"],
+                            total_slides=event_data["total_slides"],
+                            estimated_duration=event_data["estimated_duration"],
+                            slides=slide_objects,
+                            teaching_strategies=event_data.get("teaching_strategies", []),
+                            learning_outcomes=event_data.get("learning_outcomes", []),
+                            materials_summary=event_data.get("materials_summary", []),
+                            assessment_notes=event_data.get("assessment_notes")
+                        )
+                        reconstructed_events.append(event_slides)
+                        self.logger.info(f"✅ Created GagneEventSlides for event {i+1}")
+                    except Exception as e:
+                        self.logger.error(f"❌ Error creating GagneEventSlides for event {i+1}: {str(e)}")
+                        import traceback
+                        self.logger.error(f"📜 Traceback: {traceback.format_exc()}")
+                        raise
+                
+                self.logger.info(f"✅ Reconstructed {len(reconstructed_events)} events")
+                
+                # Create the GagneSlidesResponse with reconstructed events
+                try:
+                    slides_response = GagneSlidesResponse(
+                        lesson_info=gagne_slides_data["lesson_info"],
+                        total_events=gagne_slides_data["total_events"],
+                        total_slides=gagne_slides_data["total_slides"],
+                        total_duration=gagne_slides_data["total_duration"],
+                        events=reconstructed_events,
+                        generation_metadata=gagne_slides_data["generation_metadata"],
+                        created_at=gagne_slides_data["created_at"]
+                    )
+                    self.logger.info("✅ Created GagneSlidesResponse")
+                except Exception as e:
+                    self.logger.error(f"❌ Error creating GagneSlidesResponse: {str(e)}")
+                    import traceback
+                    self.logger.error(f"📜 Traceback: {traceback.format_exc()}")
+                    raise
+                
+                # Extract slides for UDL processing
+                slides = [slide for event in slides_response.events for slide in event.slides]
+                self.logger.info(f"✅ Content phase completed: {len(slides)} slides generated")
+            except Exception as e:
+                self.logger.error(f"❌ Error creating content objects: {str(e)}")
+                import traceback
+                self.logger.error(f"📜 Traceback: {traceback.format_exc()}")
+                raise Exception(f"Failed to create content objects: {str(e)}")
             
             # Phase 3: UDL Validation
-            self.logger.info("Phase 3: Validating UDL compliance")
-            udl_result = await self._execute_udl_phase(slides, lesson_request, preferences)
-            
-            if not udl_result.get("success"):
-                self.logger.warning(f"UDL phase failed: {udl_result.get('error', 'Unknown error')}")
-                # Continue with basic UDL compliance
+            self.logger.info("=" * 60)
+            self.logger.info("♿ PHASE 3: UDL VALIDATION")
+            self.logger.info("=" * 60)
+            try:
+                self.logger.info("🤖 Calling UDL agent...")
+                udl_result = await asyncio.wait_for(
+                    self._execute_udl_phase(slides, lesson_request, preferences),
+                    timeout=60  # 1 minute timeout for UDL validation
+                )
+                self.logger.info(f"✅ UDL agent returned: {type(udl_result)}")
+            except asyncio.TimeoutError:
+                self.logger.warning("⏰ UDL validation timed out, using fallback compliance")
+                udl_data = self._create_fallback_udl_compliance(slides)
+            except Exception as e:
+                self.logger.error(f"❌ UDL phase error: {str(e)}")
+                import traceback
+                self.logger.error(f"📜 Traceback: {traceback.format_exc()}")
+                self.logger.warning("Using fallback UDL compliance due to error")
                 udl_data = self._create_fallback_udl_compliance(slides)
             else:
-                udl_data = udl_result["data"]
+                if not udl_result.get("success"):
+                    error_msg = udl_result.get('error', 'Unknown error')
+                    self.logger.warning(f"⚠️ UDL phase failed: {error_msg}")
+                    self.logger.warning("Using fallback UDL compliance due to failure")
+                    udl_data = self._create_fallback_udl_compliance(slides)
+                else:
+                    udl_data = udl_result["data"]
+                    self.logger.info("✅ UDL phase succeeded")
             
             # Aggregate results
+            self.logger.info("🔍 Aggregating results...")
             result = {
                 "lesson_plan": {
                     "objectives": [obj.dict() for obj in objectives],
@@ -147,6 +330,9 @@ class CoordinatorAgent(BaseAgent):
                 }
             }
             
+            self.logger.info("=" * 80)
+            self.logger.info("✅ COORDINATOR AGENT COMPLETED SUCCESSFULLY")
+            self.logger.info("=" * 80)
             self._log_processing_success(f"Complete lesson planning finished - {slides_response.total_slides} slides, UDL compliance: {udl_data['udl_compliance_report']['overall_compliance']:.2f}")
             
             return self._create_success_response(result, metadata)
@@ -242,78 +428,82 @@ class CoordinatorAgent(BaseAgent):
         for event in gagne_events:
             # Create 2 basic slides per event
             event_slides = [
-                {
-                    "slide_number": total_slides + 1,
-                    "title": f"{event.event_name} - Overview",
-                    "content_type": "mixed",
-                    "main_content": f"# {event.event_name}\n\n{event.description}\n\n## Activities:\n" + "\n".join([f"- {activity}" for activity in event.activities]),
-                    "visual_elements": [],
-                    "audio_script": f"Audio narration for {event.event_name}",
-                    "speaker_notes": f"Speaker notes for {event.event_name}",
-                    "duration_minutes": event.duration_minutes / 2,
-                    "learning_objectives": [obj.objective for obj in objectives[:2]],
-                    "key_points": [f"Key point for {event.event_name}"],
-                    "activities": event.activities[:2],
-                    "materials_needed": event.materials_needed,
-                    "assessment_criteria": event.assessment_strategy or "Formative assessment",
-                    "accessibility_features": ["alt_text", "keyboard_navigation"],
-                    "udl_guidelines": ["multiple_representation", "engagement"],
-                    "difficulty_level": "intermediate"
-                },
-                {
-                    "slide_number": total_slides + 2,
-                    "title": f"{event.event_name} - Details",
-                    "content_type": "mixed",
-                    "main_content": f"# {event.event_name} - Detailed Content\n\n## Materials Needed:\n" + "\n".join([f"- {material}" for material in event.materials_needed]),
-                    "visual_elements": [],
-                    "audio_script": f"Detailed audio narration for {event.event_name}",
-                    "speaker_notes": f"Detailed speaker notes for {event.event_name}",
-                    "duration_minutes": event.duration_minutes / 2,
-                    "learning_objectives": [obj.objective for obj in objectives[2:4]] if len(objectives) > 2 else [],
-                    "key_points": [f"Detailed key point for {event.event_name}"],
-                    "activities": event.activities[2:4] if len(event.activities) > 2 else [],
-                    "materials_needed": event.materials_needed,
-                    "assessment_criteria": event.assessment_strategy or "Formative assessment",
-                    "accessibility_features": ["alt_text", "keyboard_navigation"],
-                    "udl_guidelines": ["multiple_representation", "engagement"],
-                    "difficulty_level": "intermediate"
-                }
+                SlideContent(
+                    slide_number=total_slides + 1,
+                    title=f"{event.event_name} - Overview",
+                    content_type="mixed",
+                    main_content=f"# {event.event_name}\n\n{event.description}\n\n## Activities:\n" + "\n".join([f"- {activity}" for activity in event.activities]),
+                    visual_elements=[],
+                    audio_script=f"Audio narration for {event.event_name}",
+                    speaker_notes=f"Speaker notes for {event.event_name}",
+                    duration_minutes=event.duration_minutes / 2,
+                    learning_objectives=[obj.objective for obj in objectives[:2]],
+                    key_points=[f"Key point for {event.event_name}"],
+                    activities=event.activities[:2],
+                    materials_needed=event.materials_needed,
+                    assessment_criteria=event.assessment_strategy or "Formative assessment",
+                    accessibility_features=["alt_text", "keyboard_navigation"],
+                    udl_guidelines=["multiple_representation", "engagement"],
+                    difficulty_level="intermediate"
+                ),
+                SlideContent(
+                    slide_number=total_slides + 2,
+                    title=f"{event.event_name} - Details",
+                    content_type="mixed",
+                    main_content=f"# {event.event_name} - Detailed Content\n\n## Materials Needed:\n" + "\n".join([f"- {material}" for material in event.materials_needed]),
+                    visual_elements=[],
+                    audio_script=f"Detailed audio narration for {event.event_name}",
+                    speaker_notes=f"Detailed speaker notes for {event.event_name}",
+                    duration_minutes=event.duration_minutes / 2,
+                    learning_objectives=[obj.objective for obj in objectives[2:4]] if len(objectives) > 2 else [],
+                    key_points=[f"Detailed key point for {event.event_name}"],
+                    activities=event.activities[2:4] if len(event.activities) > 2 else [],
+                    materials_needed=event.materials_needed,
+                    assessment_criteria=event.assessment_strategy or "Formative assessment",
+                    accessibility_features=["alt_text", "keyboard_navigation"],
+                    udl_guidelines=["multiple_representation", "engagement"],
+                    difficulty_level="intermediate"
+                )
             ]
             
             total_slides += 2
             
-            fallback_events.append({
-                "event_number": event.event_number,
-                "event_name": event.event_name,
-                "event_description": event.description,
-                "total_slides": 2,
-                "estimated_duration": event.duration_minutes,
-                "slides": event_slides,
-                "teaching_strategies": ["Direct instruction", "Interactive discussion"],
-                "learning_outcomes": [obj.objective for obj in objectives[:2]],
-                "materials_summary": event.materials_needed,
-                "assessment_notes": event.assessment_strategy
-            })
+            fallback_events.append(GagneEventSlides(
+                event_number=event.event_number,
+                event_name=event.event_name,
+                event_description=event.description,
+                total_slides=2,
+                estimated_duration=event.duration_minutes,
+                slides=event_slides,
+                teaching_strategies=["Direct instruction", "Interactive discussion"],
+                learning_outcomes=[obj.objective for obj in objectives[:2]],
+                materials_summary=event.materials_needed,
+                assessment_notes=event.assessment_strategy
+            ))
+        
+        gagne_slides_response = GagneSlidesResponse(
+            lesson_info={
+                "course_title": lesson_plan.title,
+                "lesson_topic": "Lesson Topic",
+                "grade_level": "college",
+                "duration_minutes": sum(event.duration_minutes for event in gagne_events)
+            },
+            total_events=len(fallback_events),
+            total_slides=total_slides,
+            total_duration=sum(event.duration_minutes for event in gagne_events),
+            events=fallback_events,
+            generation_metadata={
+                "service_version": "1.0.0",
+                "generation_method": "fallback",
+                "quality_level": "basic"
+            },
+            created_at=str(asyncio.get_event_loop().time())
+        )
         
         return {
-            "gagne_slides_response": {
-                "lesson_info": {
-                    "course_title": lesson_plan.title,
-                    "lesson_topic": "Lesson Topic",
-                    "grade_level": "college",
-                    "duration_minutes": sum(event.duration_minutes for event in gagne_events)
-                },
-                "total_events": len(fallback_events),
-                "total_slides": total_slides,
-                "total_duration": sum(event.duration_minutes for event in gagne_events),
-                "events": fallback_events,
-                "generation_metadata": {
-                    "service_version": "1.0.0",
-                    "generation_method": "fallback",
-                    "quality_level": "basic"
-                },
-                "created_at": str(asyncio.get_event_loop().time())
-            }
+            "gagne_slides_response": gagne_slides_response.dict(),
+            "total_duration": gagne_slides_response.total_duration,
+            "total_slides": gagne_slides_response.total_slides
         }
     
     def _create_fallback_udl_compliance(self, slides: List[SlideContent]) -> Dict[str, Any]:

@@ -6,13 +6,14 @@ maintaining backward compatibility with the existing API while leveraging the ne
 agent-based architecture for enhanced functionality and reliability.
 """
 
+import asyncio
 import logging
 from typing import Dict, Any, Optional
 from .agents.coordinator_agent import CoordinatorAgent
 from .agents.plan_agent import PlanAgent
 from .agents.content_agent import ContentAgent
 from .agents.udl_agent import UDLAgent
-from ..models.lesson import LessonRequest, LessonResponse, RefineRequest
+from ..models.lesson import LessonRequest, LessonResponse, RefineRequest, LessonObjective, LessonPlan, GagneEvent
 from ..models.gagne_slides import GagneSlidesResponse
 
 logger = logging.getLogger(__name__)
@@ -49,7 +50,14 @@ class MultiAgentService:
             LessonResponse object with complete lesson content
         """
         try:
-            logger.info(f"Generating lesson content for: {request.course_title}")
+            logger.info("=" * 80)
+            logger.info("🚀 STARTING LESSON GENERATION")
+            logger.info("=" * 80)
+            logger.info(f"📚 Course: {request.course_title}")
+            logger.info(f"📖 Topic: {request.lesson_topic}")
+            logger.info(f"🎓 Grade Level: {request.grade_level}")
+            logger.info(f"⏱️ Duration: {request.duration_minutes} minutes")
+            logger.info(f"🧠 Bloom Levels: {request.selected_bloom_levels}")
             
             # Prepare input for coordinator agent
             coordinator_input = {
@@ -58,52 +66,117 @@ class MultiAgentService:
                 "preferences": {}
             }
             
-            # Execute multi-agent lesson planning
-            result = await self.coordinator.process(coordinator_input)
+            logger.info("🔄 Starting multi-agent processing...")
+            logger.info(f"📋 Coordinator input keys: {list(coordinator_input.keys())}")
+            
+            # Execute multi-agent lesson planning with timeout
+            try:
+                logger.info("🤖 Calling coordinator.process...")
+                result = await asyncio.wait_for(
+                    self.coordinator.process(coordinator_input),
+                    timeout=300  # 5 minute timeout
+                )
+                logger.info(f"✅ Coordinator returned: {type(result)}")
+                logger.info(f"📊 Result keys: {result.keys() if isinstance(result, dict) else 'Not a dict'}")
+                logger.info(f"🎯 Result success: {result.get('success', 'No success key')}")
+            except asyncio.TimeoutError:
+                logger.error("⏰ Multi-agent processing timed out after 5 minutes")
+                raise Exception("Request timeout. The lesson generation is taking longer than expected. Please try again.")
+            except Exception as e:
+                logger.error(f"❌ Error in coordinator.process: {str(e)}")
+                logger.error(f"🔍 Error type: {type(e).__name__}")
+                import traceback
+                logger.error(f"📜 Traceback: {traceback.format_exc()}")
+                raise
+            
+            logger.info("✅ Multi-agent processing completed")
             
             if not result.get("success"):
-                raise Exception(f"Multi-agent processing failed: {result.get('error', 'Unknown error')}")
+                error_msg = result.get('error', 'Unknown error')
+                logger.error(f"❌ Multi-agent processing failed: {error_msg}")
+                raise Exception(f"Multi-agent processing failed: {error_msg}")
             
             data = result["data"]
+            logger.info("📦 Extracting components from multi-agent result...")
+            logger.info(f"📋 Data keys: {list(data.keys())}")
             
             # Extract components from multi-agent result
             lesson_plan_data = data["lesson_plan"]
             content_data = data["content"]
             udl_data = data["udl_compliance"]
             
+            logger.info(f"📊 Lesson plan data keys: {list(lesson_plan_data.keys()) if isinstance(lesson_plan_data, dict) else 'Not a dict'}")
+            logger.info(f"📊 Content data keys: {list(content_data.keys()) if isinstance(content_data, dict) else 'Not a dict'}")
+            logger.info(f"📊 UDL data keys: {list(udl_data.keys()) if isinstance(udl_data, dict) else 'Not a dict'}")
+            
+            logger.info("🎨 Creating GagneSlidesResponse...")
+            
             # Create GagneSlidesResponse from content data
-            gagne_slides_response = GagneSlidesResponse(**content_data["gagne_slides_response"])
+            try:
+                logger.info(f"🔍 Content data gagne_slides_response type: {type(content_data['gagne_slides_response'])}")
+                gagne_slides_response = GagneSlidesResponse(**content_data["gagne_slides_response"])
+                logger.info(f"✅ GagneSlidesResponse created with {gagne_slides_response.total_slides} slides")
+                logger.info(f"📊 Events count: {len(gagne_slides_response.events)}")
+            except Exception as e:
+                logger.error(f"❌ Error creating GagneSlidesResponse: {str(e)}")
+                logger.error(f"🔍 Error type: {type(e).__name__}")
+                import traceback
+                logger.error(f"📜 Traceback: {traceback.format_exc()}")
+                raise Exception(f"Failed to create slides response: {str(e)}")
+            
+            logger.info("📝 Creating LessonResponse...")
             
             # Create LessonResponse maintaining backward compatibility
-            lesson_response = LessonResponse(
-                lesson_info={
-                    "course_title": request.course_title,
-                    "lesson_topic": request.lesson_topic,
-                    "grade_level": request.grade_level,
-                    "duration_minutes": request.duration_minutes
-                },
-                objectives=lesson_plan_data["objectives"],
-                lesson_plan=lesson_plan_data["lesson_plan"],
-                gagne_events=lesson_plan_data["gagne_events"],
-                gagne_slides=gagne_slides_response,
-                udl_compliance=udl_data,
-                recommendations=data.get("recommendations", []),
-                accessibility_features=data.get("accessibility_features", []),
-                metadata={
-                    "generation_method": "multi_agent",
-                    "agent_versions": result["metadata"].get("agent_versions", {}),
-                    "processing_phases": result["metadata"].get("phases_completed", []),
-                    "total_slides": content_data["total_slides"],
-                    "total_duration": content_data["total_duration"],
-                    "udl_compliance_score": udl_data.get("overall_compliance", 0.0)
-                }
-            )
+            try:
+                logger.info("🔍 Creating objectives...")
+                objectives = [LessonObjective(**obj) for obj in lesson_plan_data["objectives"]]
+                logger.info(f"✅ Created {len(objectives)} objectives")
+                
+                logger.info("🔍 Creating lesson plan...")
+                lesson_plan = LessonPlan(**lesson_plan_data["lesson_plan"])
+                logger.info("✅ Lesson plan created")
+                
+                logger.info("🔍 Creating Gagne events...")
+                gagne_events = [GagneEvent(**event) for event in lesson_plan_data["gagne_events"]]
+                logger.info(f"✅ Created {len(gagne_events)} Gagne events")
+                
+                logger.info("🔍 Creating final LessonResponse...")
+                lesson_response = LessonResponse(
+                    lesson_info={
+                        "course_title": request.course_title,
+                        "lesson_topic": request.lesson_topic,
+                        "grade_level": request.grade_level,
+                        "duration_minutes": request.duration_minutes
+                    },
+                    objectives=objectives,
+                    lesson_plan=lesson_plan,
+                    gagne_events=gagne_events,
+                    gagne_slides=gagne_slides_response.dict(),
+                    total_duration=content_data["total_duration"],
+                    created_at=str(asyncio.get_event_loop().time())
+                )
+                logger.info("✅ LessonResponse created successfully")
+            except Exception as e:
+                logger.error(f"❌ Error creating LessonResponse: {str(e)}")
+                logger.error(f"🔍 Error type: {type(e).__name__}")
+                import traceback
+                logger.error(f"📜 Traceback: {traceback.format_exc()}")
+                raise Exception(f"Failed to create lesson response: {str(e)}")
             
-            logger.info(f"Successfully generated lesson with {content_data['total_slides']} slides")
+            logger.info(f"🎉 Successfully generated lesson with {content_data['total_slides']} slides")
+            logger.info("=" * 80)
+            logger.info("✅ LESSON GENERATION COMPLETED")
+            logger.info("=" * 80)
             return lesson_response
             
         except Exception as e:
-            logger.error(f"Error in generate_lesson_content: {str(e)}")
+            logger.error("=" * 80)
+            logger.error("❌ LESSON GENERATION FAILED")
+            logger.error("=" * 80)
+            logger.error(f"❌ Error: {str(e)}")
+            logger.error(f"🔍 Error type: {type(e).__name__}")
+            import traceback
+            logger.error(f"📜 Traceback: {traceback.format_exc()}")
             raise
     
     async def refine_content(self, request: RefineRequest) -> Dict[str, Any]:

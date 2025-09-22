@@ -16,7 +16,7 @@ import json
 import asyncio
 import logging
 from typing import Dict, Any, List, Optional
-from ..base_agent import BaseAgent
+from .base_agent import BaseAgent
 from ...models.gagne_slides import (
     GagneEventSlides, SlideContent, VisualElement, SlideContentType, 
     VisualElementType, GagneSlidesResponse, SlideGenerationRequest
@@ -61,10 +61,20 @@ class ContentAgent(BaseAgent):
                 - metadata: Processing metadata
         """
         try:
+            self.logger.info("=" * 80)
+            self.logger.info("🎨 CONTENT AGENT STARTING")
+            self.logger.info("=" * 80)
+            
             gagne_events = input_data.get("gagne_events", [])
             objectives = input_data.get("objectives", [])
             lesson_plan = input_data.get("lesson_plan")
             lesson_info = input_data.get("lesson_info", {})
+            
+            self.logger.info(f"📊 Input data keys: {list(input_data.keys())}")
+            self.logger.info(f"📋 Gagne events count: {len(gagne_events)}")
+            self.logger.info(f"🎯 Objectives count: {len(objectives)}")
+            self.logger.info(f"📖 Lesson plan type: {type(lesson_plan)}")
+            self.logger.info(f"ℹ️ Lesson info: {lesson_info}")
             
             if not gagne_events:
                 raise ValueError("gagne_events is required")
@@ -76,13 +86,20 @@ class ContentAgent(BaseAgent):
             self._log_processing_start(f"Generating content for {len(gagne_events)} events")
             
             # Generate comprehensive slides for all events
+            self.logger.info("🤖 Calling generate_slides_for_all_events...")
             gagne_slides_response = await self.generate_slides_for_all_events(
                 gagne_events, objectives, lesson_plan, lesson_info
             )
+            self.logger.info(f"✅ generate_slides_for_all_events completed")
+            self.logger.info(f"📊 Response type: {type(gagne_slides_response)}")
+            self.logger.info(f"📊 Total slides: {gagne_slides_response.total_slides}")
+            self.logger.info(f"📊 Total events: {gagne_slides_response.total_events}")
             
+            self.logger.info("🔄 Converting to dictionary...")
             result = {
                 "gagne_slides_response": gagne_slides_response.dict()
             }
+            self.logger.info("✅ Dictionary conversion completed")
             
             metadata = {
                 "total_events": len(gagne_events),
@@ -92,11 +109,21 @@ class ContentAgent(BaseAgent):
                 "quality_level": "premium"
             }
             
+            self.logger.info("=" * 80)
+            self.logger.info("✅ CONTENT AGENT COMPLETED SUCCESSFULLY")
+            self.logger.info("=" * 80)
             self._log_processing_success(f"Generated {gagne_slides_response.total_slides} slides across {len(gagne_events)} events")
             
             return self._create_success_response(result, metadata)
             
         except Exception as e:
+            self.logger.error("=" * 80)
+            self.logger.error("❌ CONTENT AGENT FAILED")
+            self.logger.error("=" * 80)
+            self.logger.error(f"❌ Error: {str(e)}")
+            self.logger.error(f"🔍 Error type: {type(e).__name__}")
+            import traceback
+            self.logger.error(f"📜 Traceback: {traceback.format_exc()}")
             self._log_processing_error(e)
             return self._create_error_response(e)
     
@@ -170,9 +197,9 @@ class ContentAgent(BaseAgent):
     
     async def generate_slides_for_all_events(
         self, 
-        gagne_events: List[GagneEvent], 
-        objectives: List[LessonObjective],
-        lesson_plan: LessonPlan,
+        gagne_events: List[Any], 
+        objectives: List[Any],
+        lesson_plan: Any,
         lesson_info: Dict[str, Any]
     ) -> GagneSlidesResponse:
         """Generate comprehensive slides for all Gagne events"""
@@ -216,20 +243,30 @@ class ContentAgent(BaseAgent):
     
     async def _generate_slides_for_event(
         self, 
-        event: GagneEvent, 
-        objectives: List[LessonObjective],
-        lesson_plan: LessonPlan,
+        event: Any, 
+        objectives: List[Any],
+        lesson_plan: Any,
         lesson_info: Dict[str, Any]
     ) -> GagneEventSlides:
         """Generate slides for a specific Gagne event"""
         try:
-            event_number = event.event_number
-            event_name = event.event_name
-            event_description = event.description
-            activities = event.activities
-            duration_minutes = event.duration_minutes
-            materials_needed = event.materials_needed
-            assessment_strategy = event.assessment_strategy
+            # Handle both dictionary and object formats
+            if isinstance(event, dict):
+                event_number = event.get("event_number", 1)
+                event_name = event.get("event_name", "Unknown Event")
+                event_description = event.get("description", "No description")
+                activities = event.get("activities", [])
+                duration_minutes = event.get("duration_minutes", 10)
+                materials_needed = event.get("materials_needed", [])
+                assessment_strategy = event.get("assessment_strategy", "Formative assessment")
+            else:
+                event_number = event.event_number
+                event_name = event.event_name
+                event_description = event.description
+                activities = event.activities
+                duration_minutes = event.duration_minutes
+                materials_needed = event.materials_needed
+                assessment_strategy = event.assessment_strategy
             
             # Get event template
             template = self.event_templates.get(event_number, self.event_templates[4])  # Default to event 4
@@ -321,12 +358,22 @@ class ContentAgent(BaseAgent):
         """Create AI-generated slides for the event"""
         try:
             # Prepare context for AI
-            objectives_text = "\n".join([f"- {obj.objective}" for obj in objectives])
-            activities_text = "\n".join([f"- {activity}" for activity in event.activities])
+            if isinstance(objectives[0], dict):
+                objectives_text = "\n".join([f"- {obj.get('objective', 'No objective')}" for obj in objectives])
+            else:
+                objectives_text = "\n".join([f"- {obj.objective}" for obj in objectives])
+            
+            if isinstance(event, dict):
+                activities_text = "\n".join([f"- {activity}" for activity in event.get('activities', [])])
+            else:
+                activities_text = "\n".join([f"- {activity}" for activity in event.activities])
             
             # Create comprehensive prompt
+            event_number = event.get("event_number", 1) if isinstance(event, dict) else event.event_number
+            event_name = event.get("event_name", "Unknown Event") if isinstance(event, dict) else event.event_name
+            
             prompt = f"""
-Create {slide_count} comprehensive, ready-to-use teaching slides for Gagne's Event {event.event_number}: {event.event_name}
+Create {slide_count} comprehensive, ready-to-use teaching slides for Gagne's Event {event_number}: {event_name}
 
 LESSON CONTEXT:
 Course: {lesson_info.get('course_title', '')}

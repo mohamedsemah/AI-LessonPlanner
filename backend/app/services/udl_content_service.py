@@ -5,9 +5,10 @@ import logging
 from typing import List, Dict, Any
 from openai import AsyncOpenAI
 from ..models.udl_content import (
-    CourseContentRequest, CourseContentResponse, SlideContent, 
+    CourseContentRequest, CourseContentResponse, 
     UDLComplianceReport, UDLPrinciple, ContentModality
 )
+from ..models.gagne_slides import SlideContent
 
 # Set up logging
 logger = logging.getLogger(__name__)

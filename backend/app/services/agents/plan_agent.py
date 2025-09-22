@@ -14,7 +14,7 @@ and lesson durations.
 import json
 import logging
 from typing import Dict, Any, List
-from ..base_agent import BaseAgent
+from .base_agent import BaseAgent
 from ...models.lesson import (
     LessonRequest, LessonObjective, LessonPlan, GagneEvent, 
     BloomLevel, GradeLevel

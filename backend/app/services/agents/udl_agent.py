@@ -15,10 +15,11 @@ provides comprehensive accessibility for diverse learners.
 import json
 import logging
 from typing import Dict, Any, List, Optional
-from ..base_agent import BaseAgent
+from .base_agent import BaseAgent
 from ...models.udl_content import (
-    UDLComplianceReport, UDLPrinciple, ContentModality, SlideContent
+    UDLComplianceReport, UDLPrinciple, ContentModality
 )
+from ...models.gagne_slides import SlideContent
 
 logger = logging.getLogger(__name__)
 
@@ -66,21 +67,29 @@ class UDLAgent(BaseAgent):
             if not slides:
                 raise ValueError("slides are required for UDL validation")
             
-            self._log_processing_start(f"Validating UDL compliance for {len(slides)} slides")
+            # Convert slides to dictionaries if they are objects
+            slide_dicts = []
+            for slide in slides:
+                if isinstance(slide, dict):
+                    slide_dicts.append(slide)
+                else:
+                    slide_dicts.append(slide.dict())
+            
+            self._log_processing_start(f"Validating UDL compliance for {len(slide_dicts)} slides")
             
             # Calculate UDL compliance
-            udl_compliance_report = await self._calculate_udl_compliance(slides, lesson_info)
+            udl_compliance_report = await self._calculate_udl_compliance(slide_dicts, lesson_info)
             
             # Generate recommendations
-            recommendations = self._generate_udl_recommendations(slides, udl_compliance_report.missing_guidelines)
+            recommendations = self._generate_udl_recommendations(slide_dicts, udl_compliance_report.missing_guidelines)
             
             # Extract accessibility features
-            accessibility_features = self._extract_accessibility_features(slides)
+            accessibility_features = self._extract_accessibility_features(slide_dicts)
             
             # Handle refinement request if provided
             refined_content = None
             if refinement_request:
-                refined_content = await self._refine_content_for_udl(refinement_request, slides)
+                refined_content = await self._refine_content_for_udl(refinement_request, slide_dicts)
             
             result = {
                 "udl_compliance_report": udl_compliance_report.dict(),
@@ -237,7 +246,7 @@ class UDLAgent(BaseAgent):
             implemented_guidelines = 0
             
             for slide in slides:
-                for guideline in slide.udl_guidelines:
+                for guideline in slide.get("udl_guidelines", []):
                     if principle in guideline.lower():
                         implemented_guidelines += 1
             
@@ -251,7 +260,7 @@ class UDLAgent(BaseAgent):
         try:
             implemented = set()
             for slide in slides:
-                implemented.update(slide.udl_guidelines)
+                implemented.update(slide.get("udl_guidelines", []))
             
             all_guidelines = set()
             for principle_name, principle_data in self.udl_guidelines.items():
@@ -283,13 +292,13 @@ class UDLAgent(BaseAgent):
                 recommendations.append("Add choice-based activities and relevant real-world examples")
             
             # Additional recommendations based on content analysis
-            if not any("multiple_representation" in slide.udl_guidelines for slide in slides):
+            if not any("multiple_representation" in slide.get("udl_guidelines", []) for slide in slides):
                 recommendations.append("Implement multiple means of representation across all slides")
             
-            if not any("engagement" in slide.udl_guidelines for slide in slides):
+            if not any("engagement" in slide.get("udl_guidelines", []) for slide in slides):
                 recommendations.append("Add engagement strategies to increase student motivation")
             
-            if not any("action_expression" in slide.udl_guidelines for slide in slides):
+            if not any("action_expression" in slide.get("udl_guidelines", []) for slide in slides):
                 recommendations.append("Provide multiple means of action and expression for student responses")
             
             return recommendations
@@ -333,8 +342,8 @@ Refine the following slide content to improve {refinement_type} and enhance UDL 
 CURRENT SLIDE CONTENT:
 Title: {target_slide.title}
 Content: {target_slide.main_content}
-Current UDL Guidelines: {', '.join(target_slide.udl_guidelines)}
-Current Accessibility Features: {', '.join(target_slide.accessibility_features)}
+Current UDL Guidelines: {', '.join(target_slide.get("udl_guidelines", []))}
+Current Accessibility Features: {', '.join(target_slide.get("accessibility_features", []))}
 
 REFINEMENT INSTRUCTIONS:
 {instructions}
@@ -478,7 +487,7 @@ Focus on making the content more accessible, engaging, and compliant with UDL pr
                 recommendations.append("Add hands-on activities or interactive elements")
             
             # Check engagement
-            if not any("engagement" in guideline for guideline in slide.udl_guidelines):
+            if not any("engagement" in guideline for guideline in slide.get("udl_guidelines", [])):
                 compliance_issues.append("Missing engagement strategies")
                 recommendations.append("Add engagement-focused UDL guidelines")
             
@@ -494,8 +503,8 @@ Focus on making the content more accessible, engaging, and compliant with UDL pr
                 "compliance_score": compliance_score,
                 "issues": compliance_issues,
                 "recommendations": recommendations,
-                "udl_guidelines_implemented": slide.udl_guidelines,
-                "accessibility_features_implemented": slide.accessibility_features
+                "udl_guidelines_implemented": slide.get("udl_guidelines", []),
+                "accessibility_features_implemented": slide.get("accessibility_features", [])
             }
             
         except Exception as e:

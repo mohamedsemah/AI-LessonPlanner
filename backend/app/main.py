@@ -8,8 +8,8 @@ import logging
 from .routers.lesson import router as lesson_router
 from .routers.udl_content import router as udl_content_router
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from the backend directory
+load_dotenv(dotenv_path=".env")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
