@@ -164,7 +164,11 @@ class CoordinatorAgent(BaseAgent):
                     content_data = self._create_fallback_content(gagne_events, objectives, lesson_plan)
                 else:
                     content_data = content_result["data"]
-                    self.logger.info("✅ Content phase succeeded")
+                    # Check if content agent used fallback content
+                    if content_result.get("metadata", {}).get("fallback_used"):
+                        self.logger.info("✅ Content phase succeeded with fallback content")
+                    else:
+                        self.logger.info("✅ Content phase succeeded with AI-generated content")
             
             try:
                 self.logger.info("🔍 Processing content data...")

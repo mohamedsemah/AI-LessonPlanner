@@ -348,9 +348,9 @@ class ContentAgent(BaseAgent):
     
     async def _create_ai_generated_slides(
         self, 
-        event: GagneEvent, 
-        objectives: List[LessonObjective],
-        lesson_plan: LessonPlan,
+        event: Any, 
+        objectives: List[Any],
+        lesson_plan: Any,
         lesson_info: Dict[str, Any],
         slide_count: int,
         template: Dict[str, Any]
@@ -379,7 +379,7 @@ LESSON CONTEXT:
 Course: {lesson_info.get('course_title', '')}
 Topic: {lesson_info.get('lesson_topic', '')}
 Grade Level: {lesson_info.get('grade_level', '')}
-Event Duration: {event.duration_minutes} minutes
+Event Duration: {event.get('duration_minutes', 10) if isinstance(event, dict) else event.duration_minutes} minutes
 
 LEARNING OBJECTIVES:
 {objectives_text}
@@ -388,10 +388,10 @@ EVENT ACTIVITIES:
 {activities_text}
 
 MATERIALS NEEDED:
-{', '.join(event.materials_needed)}
+{', '.join(event.get('materials_needed', []) if isinstance(event, dict) else event.materials_needed)}
 
 ASSESSMENT STRATEGY:
-{event.assessment_strategy or 'Formative assessment throughout'}
+{event.get('assessment_strategy', 'Formative assessment throughout') if isinstance(event, dict) else (event.assessment_strategy or 'Formative assessment throughout')}
 
 SLIDE REQUIREMENTS:
 - Create authentic, ready-to-use educational content
@@ -495,16 +495,19 @@ CRITICAL: Return ONLY the JSON array, no markdown, no code blocks, no explanatio
                         slide = self._create_slide_object(slide_data, i + 1)
                         slides.append(slide)
                     
-                    self.logger.info(f"Successfully generated {len(slides)} slides for event {event.event_number}")
+                    event_num = event.get("event_number", 1) if isinstance(event, dict) else event.event_number
+                    self.logger.info(f"Successfully generated {len(slides)} slides for event {event_num}")
                     return slides
                     
                 except (json.JSONDecodeError, KeyError, ValueError) as e:
-                    self.logger.warning(f"Attempt {attempt + 1} failed for event {event.event_number}: {str(e)}")
+                    event_num = event.get("event_number", 1) if isinstance(event, dict) else event.event_number
+                    self.logger.warning(f"Attempt {attempt + 1} failed for event {event_num}: {str(e)}")
                     if attempt < 2:
                         continue
                     else:
                         # Final attempt failed, use fallback
-                        self.logger.warning(f"All attempts failed for event {event.event_number}, using fallback")
+                        event_num = event.get("event_number", 1) if isinstance(event, dict) else event.event_number
+                        self.logger.warning(f"All attempts failed for event {event_num}, using fallback")
                         return self._create_fallback_slides(event, objectives, slide_count)
             
         except Exception as e:
@@ -545,7 +548,7 @@ CRITICAL: Return ONLY the JSON array, no markdown, no code blocks, no explanatio
                 accessibility_features=slide_data.get("accessibility_features", []),
                 udl_guidelines=slide_data.get("udl_guidelines", []),
                 difficulty_level=slide_data.get("difficulty_level", "intermediate"),
-                estimated_reading_time=slide_data.get("estimated_reading_time")
+                estimated_reading_time=int(slide_data.get("estimated_reading_time", 2)) if slide_data.get("estimated_reading_time") else None
             )
             
         except Exception as e:
@@ -554,15 +557,23 @@ CRITICAL: Return ONLY the JSON array, no markdown, no code blocks, no explanatio
     
     def _create_fallback_slides(
         self, 
-        event: GagneEvent, 
-        objectives: List[LessonObjective], 
+        event: Any, 
+        objectives: List[Any], 
         slide_count: int
     ) -> List[SlideContent]:
         """Create fallback slides when AI generation fails"""
         slides = []
         
+        # Handle both dictionary and object formats
+        if isinstance(event, dict):
+            event_name = event.get("event_name", "Unknown Event")
+            activities = event.get("activities", [])
+        else:
+            event_name = event.event_name
+            activities = event.activities
+        
         for i in range(slide_count):
-            slide = self._create_basic_slide(i + 1, event.event_name, event.activities)
+            slide = self._create_basic_slide(i + 1, event_name, activities)
             slides.append(slide)
         
         return slides
@@ -596,24 +607,38 @@ CRITICAL: Return ONLY the JSON array, no markdown, no code blocks, no explanatio
     
     def _create_fallback_event_slides(
         self, 
-        event: GagneEvent, 
-        objectives: List[LessonObjective], 
+        event: Any, 
+        objectives: List[Any], 
         lesson_info: Dict[str, Any]
     ) -> GagneEventSlides:
         """Create fallback event slides when generation fails"""
         slides = self._create_fallback_slides(event, objectives, 2)
         
+        # Handle both dictionary and object formats
+        if isinstance(event, dict):
+            event_number = event.get("event_number", 1)
+            event_name = event.get("event_name", "Unknown Event")
+            event_description = event.get("description", "No description")
+            materials_needed = event.get("materials_needed", [])
+            assessment_strategy = event.get("assessment_strategy", "Formative assessment")
+        else:
+            event_number = event.event_number
+            event_name = event.event_name
+            event_description = event.description
+            materials_needed = event.materials_needed
+            assessment_strategy = event.assessment_strategy
+        
         return GagneEventSlides(
-            event_number=event.event_number,
-            event_name=event.event_name,
-            event_description=event.description,
+            event_number=event_number,
+            event_name=event_name,
+            event_description=event_description,
             total_slides=len(slides),
             estimated_duration=sum(slide.duration_minutes for slide in slides),
             slides=slides,
             teaching_strategies=[],
             learning_outcomes=[],
-            materials_summary=event.materials_needed,
-            assessment_notes=event.assessment_strategy
+            materials_summary=materials_needed,
+            assessment_notes=assessment_strategy
         )
     
     def _extract_teaching_strategies(self, activities: List[str], event_name: str) -> List[str]:
@@ -634,19 +659,27 @@ CRITICAL: Return ONLY the JSON array, no markdown, no code blocks, no explanatio
         
         return list(set(strategies)) if strategies else ["Direct instruction"]
     
-    def _extract_learning_outcomes(self, objectives: List[LessonObjective], event_number: int) -> List[str]:
+    def _extract_learning_outcomes(self, objectives: List[Any], event_number: int) -> List[str]:
         """Extract learning outcomes relevant to the event"""
         outcomes = []
         
         for obj in objectives:
+            # Handle both dictionary and object formats
+            if isinstance(obj, dict):
+                bloom_level = obj.get("bloom_level", "understand")
+                objective_text = obj.get("objective", "No objective")
+            else:
+                bloom_level = obj.bloom_level.value if hasattr(obj.bloom_level, 'value') else str(obj.bloom_level)
+                objective_text = obj.objective
+            
             if event_number <= 4:  # Events 1-4: Knowledge and comprehension
-                if obj.bloom_level.value in ["remember", "understand"]:
-                    outcomes.append(obj.objective)
+                if bloom_level in ["remember", "understand"]:
+                    outcomes.append(objective_text)
             elif event_number <= 6:  # Events 5-6: Application and analysis
-                if obj.bloom_level.value in ["apply", "analyze"]:
-                    outcomes.append(obj.objective)
+                if bloom_level in ["apply", "analyze"]:
+                    outcomes.append(objective_text)
             else:  # Events 7-9: Evaluation and creation
-                if obj.bloom_level.value in ["evaluate", "create"]:
-                    outcomes.append(obj.objective)
+                if bloom_level in ["evaluate", "create"]:
+                    outcomes.append(objective_text)
         
         return outcomes[:3] if outcomes else ["Students will demonstrate understanding"]
