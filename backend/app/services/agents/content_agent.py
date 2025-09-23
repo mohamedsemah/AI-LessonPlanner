@@ -283,7 +283,18 @@ class ContentAgent(BaseAgent):
                 event, objectives, lesson_plan, lesson_info, slide_count, template
             )
             
-            # Use the planned duration from the event, not sum of slide durations
+            # Adjust slide durations to match planned event duration
+            if slides:
+                # Calculate total duration from AI-generated slides
+                ai_total_duration = sum(slide.duration_minutes for slide in slides)
+                
+                # If there's a mismatch, proportionally adjust slide durations
+                if ai_total_duration > 0 and abs(ai_total_duration - duration_minutes) > 0.1:
+                    adjustment_factor = duration_minutes / ai_total_duration
+                    for slide in slides:
+                        slide.duration_minutes = round(slide.duration_minutes * adjustment_factor, 1)
+            
+            # Use the planned duration from the event
             total_duration = duration_minutes
             
             # Extract teaching strategies and learning outcomes
