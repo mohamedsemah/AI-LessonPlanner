@@ -283,8 +283,8 @@ class ContentAgent(BaseAgent):
                 event, objectives, lesson_plan, lesson_info, slide_count, template
             )
             
-            # Calculate event totals
-            total_duration = sum(slide.duration_minutes for slide in slides)
+            # Use the planned duration from the event, not sum of slide durations
+            total_duration = duration_minutes
             
             # Extract teaching strategies and learning outcomes
             teaching_strategies = self._extract_teaching_strategies(activities, event_name)
