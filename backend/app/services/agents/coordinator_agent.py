@@ -23,6 +23,8 @@ from .design_agent import DesignAgent
 from .accessibility_agent import AccessibilityAgent
 from ...models.lesson import LessonRequest, LessonObjective, LessonPlan, GagneEvent
 from ...models.gagne_slides import GagneSlidesResponse, SlideContent, GagneEventSlides
+from ...models.design_content import DesignComplianceReport
+from ...models.accessibility_content import AccessibilityComplianceReport
 
 logger = logging.getLogger(__name__)
 
@@ -374,9 +376,9 @@ class CoordinatorAgent(BaseAgent):
                     "total_slides": slides_response.total_slides,
                     "total_duration": slides_response.total_duration
                 },
-                "udl_compliance": udl_data["udl_compliance_report"],
-                "design_compliance": design_data["design_compliance_report"],
-                "accessibility_compliance": accessibility_data["accessibility_compliance_report"],
+                "udl_compliance": udl_data["udl_compliance_report"].dict() if hasattr(udl_data["udl_compliance_report"], 'dict') else udl_data["udl_compliance_report"],
+                "design_compliance": design_data["design_compliance_report"].dict() if hasattr(design_data["design_compliance_report"], 'dict') else design_data["design_compliance_report"],
+                "accessibility_compliance": accessibility_data["accessibility_compliance_report"].dict() if hasattr(accessibility_data["accessibility_compliance_report"], 'dict') else accessibility_data["accessibility_compliance_report"],
                 "recommendations": udl_data.get("recommendations", []),
                 "design_recommendations": design_data.get("recommendations", []),
                 "accessibility_recommendations": accessibility_data.get("recommendations", []),
@@ -388,7 +390,7 @@ class CoordinatorAgent(BaseAgent):
                 "total_objectives": len(objectives),
                 "total_events": len(gagne_events),
                 "total_slides": slides_response.total_slides,
-                "overall_udl_compliance": udl_data["udl_compliance_report"]["overall_compliance"],
+                "overall_udl_compliance": udl_data["udl_compliance_report"].overall_compliance if hasattr(udl_data["udl_compliance_report"], 'overall_compliance') else udl_data["udl_compliance_report"].get("overall_compliance", 0.5),
                 "processing_time": "calculated_in_seconds",
                 "agent_versions": {
                     "plan_agent": "1.0.0",

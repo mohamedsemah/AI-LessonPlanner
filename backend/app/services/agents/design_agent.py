@@ -4,6 +4,10 @@ from typing import Dict, Any, List, Optional
 from openai import AsyncOpenAI
 from .base_agent import BaseAgent
 from ...models.gagne_slides import SlideContent
+from ...models.design_content import (
+    DesignComplianceReport, DesignPrinciple, DesignRecommendation,
+    DesignPrincipleType, DesignComplianceLevel, DesignRecommendationPriority
+)
 
 logger = logging.getLogger(__name__)
 
@@ -122,14 +126,14 @@ class DesignAgent(BaseAgent):
                 }
             }
             
-            self._log_processing_success(f"Design validation completed - Overall score: {design_compliance_report['overall_score']:.2f}")
+            self._log_processing_success(f"Design validation completed - Overall score: {design_compliance_report.overall_score:.2f}")
             return self._create_success_response(result)
             
         except Exception as e:
             self._log_processing_error(e)
             return self._create_error_response(e)
     
-    async def _validate_crap_principles(self, slides: List[Dict[str, Any]], validation_level: str) -> Dict[str, Any]:
+    async def _validate_crap_principles(self, slides: List[Dict[str, Any]], validation_level: str) -> DesignComplianceReport:
         """Validate slides against C.R.A.P. principles."""
         try:
             contrast_score = await self._validate_contrast(slides, validation_level)
@@ -140,48 +144,81 @@ class DesignAgent(BaseAgent):
             # Calculate overall score
             overall_score = (contrast_score + repetition_score + alignment_score + proximity_score) / 4
             
-            return {
-                "contrast_score": contrast_score,
-                "repetition_score": repetition_score,
-                "alignment_score": alignment_score,
-                "proximity_score": proximity_score,
-                "overall_score": overall_score,
-                "validation_level": validation_level,
-                "principles": {
-                    "contrast": {
-                        "score": contrast_score,
-                        "status": "pass" if contrast_score >= 0.7 else "fail",
-                        "details": "Color contrast and readability validation"
-                    },
-                    "repetition": {
-                        "score": repetition_score,
-                        "status": "pass" if repetition_score >= 0.7 else "fail",
-                        "details": "Consistent design elements validation"
-                    },
-                    "alignment": {
-                        "score": alignment_score,
-                        "status": "pass" if alignment_score >= 0.7 else "fail",
-                        "details": "Visual alignment and structure validation"
-                    },
-                    "proximity": {
-                        "score": proximity_score,
-                        "status": "pass" if proximity_score >= 0.7 else "fail",
-                        "details": "Logical grouping and spacing validation"
-                    }
-                }
+            # Create principle objects
+            principles = {
+                "contrast": DesignPrinciple(
+                    principle=DesignPrincipleType.CONTRAST,
+                    score=contrast_score,
+                    status=DesignComplianceLevel.EXCELLENT if contrast_score >= 0.8 else 
+                           DesignComplianceLevel.GOOD if contrast_score >= 0.6 else
+                           DesignComplianceLevel.FAIR if contrast_score >= 0.4 else
+                           DesignComplianceLevel.POOR,
+                    details="Color contrast and readability validation",
+                    violations=[] if contrast_score >= 0.7 else ["Insufficient color contrast"],
+                    recommendations=[] if contrast_score >= 0.7 else ["Improve color contrast ratios"]
+                ),
+                "repetition": DesignPrinciple(
+                    principle=DesignPrincipleType.REPETITION,
+                    score=repetition_score,
+                    status=DesignComplianceLevel.EXCELLENT if repetition_score >= 0.8 else 
+                           DesignComplianceLevel.GOOD if repetition_score >= 0.6 else
+                           DesignComplianceLevel.FAIR if repetition_score >= 0.4 else
+                           DesignComplianceLevel.POOR,
+                    details="Consistent design elements validation",
+                    violations=[] if repetition_score >= 0.7 else ["Inconsistent design elements"],
+                    recommendations=[] if repetition_score >= 0.7 else ["Establish consistent design patterns"]
+                ),
+                "alignment": DesignPrinciple(
+                    principle=DesignPrincipleType.ALIGNMENT,
+                    score=alignment_score,
+                    status=DesignComplianceLevel.EXCELLENT if alignment_score >= 0.8 else 
+                           DesignComplianceLevel.GOOD if alignment_score >= 0.6 else
+                           DesignComplianceLevel.FAIR if alignment_score >= 0.4 else
+                           DesignComplianceLevel.POOR,
+                    details="Visual alignment and structure validation",
+                    violations=[] if alignment_score >= 0.7 else ["Poor visual alignment"],
+                    recommendations=[] if alignment_score >= 0.7 else ["Improve element alignment"]
+                ),
+                "proximity": DesignPrinciple(
+                    principle=DesignPrincipleType.PROXIMITY,
+                    score=proximity_score,
+                    status=DesignComplianceLevel.EXCELLENT if proximity_score >= 0.8 else 
+                           DesignComplianceLevel.GOOD if proximity_score >= 0.6 else
+                           DesignComplianceLevel.FAIR if proximity_score >= 0.4 else
+                           DesignComplianceLevel.POOR,
+                    details="Logical grouping and spacing validation",
+                    violations=[] if proximity_score >= 0.7 else ["Poor content grouping"],
+                    recommendations=[] if proximity_score >= 0.7 else ["Improve content proximity and grouping"]
+                )
             }
+            
+            return DesignComplianceReport(
+                contrast_score=contrast_score,
+                repetition_score=repetition_score,
+                alignment_score=alignment_score,
+                proximity_score=proximity_score,
+                overall_score=overall_score,
+                validation_level=validation_level,
+                principles=principles,
+                recommendations=[],
+                violations=[],
+                metadata={"total_slides": len(slides)}
+            )
             
         except Exception as e:
             self.logger.error(f"Error validating C.R.A.P. principles: {str(e)}")
-            return {
-                "contrast_score": 0.0,
-                "repetition_score": 0.0,
-                "alignment_score": 0.0,
-                "proximity_score": 0.0,
-                "overall_score": 0.0,
-                "validation_level": validation_level,
-                "error": str(e)
-            }
+            return DesignComplianceReport(
+                contrast_score=0.0,
+                repetition_score=0.0,
+                alignment_score=0.0,
+                proximity_score=0.0,
+                overall_score=0.0,
+                validation_level=validation_level,
+                principles={},
+                recommendations=[],
+                violations=[],
+                metadata={"error": str(e)}
+            )
     
     async def _validate_contrast(self, slides: List[Dict[str, Any]], validation_level: str) -> float:
         """Validate contrast principles."""
@@ -344,12 +381,12 @@ class DesignAgent(BaseAgent):
             self.logger.error(f"Error validating proximity: {str(e)}")
             return 0.0
     
-    def _generate_design_recommendations(self, slides: List[Dict[str, Any]], compliance_report: Dict[str, Any]) -> List[str]:
+    def _generate_design_recommendations(self, slides: List[Dict[str, Any]], compliance_report: DesignComplianceReport) -> List[str]:
         """Generate design improvement recommendations."""
         recommendations = []
         
         # Contrast recommendations
-        if compliance_report.get("contrast_score", 0) < 0.7:
+        if compliance_report.contrast_score < 0.7:
             recommendations.extend([
                 "Improve color contrast between text and background",
                 "Ensure minimum font size of 12pt for body text",
@@ -358,7 +395,7 @@ class DesignAgent(BaseAgent):
             ])
         
         # Repetition recommendations
-        if compliance_report.get("repetition_score", 0) < 0.7:
+        if compliance_report.repetition_score < 0.7:
             recommendations.extend([
                 "Maintain consistent font family across all slides",
                 "Use consistent heading styles and sizes",
@@ -367,7 +404,7 @@ class DesignAgent(BaseAgent):
             ])
         
         # Alignment recommendations
-        if compliance_report.get("alignment_score", 0) < 0.7:
+        if compliance_report.alignment_score < 0.7:
             recommendations.extend([
                 "Align all text elements consistently (left, center, or right)",
                 "Use a grid system for element placement",
@@ -376,7 +413,7 @@ class DesignAgent(BaseAgent):
             ])
         
         # Proximity recommendations
-        if compliance_report.get("proximity_score", 0) < 0.7:
+        if compliance_report.proximity_score < 0.7:
             recommendations.extend([
                 "Group related content elements together",
                 "Use white space to separate different sections",

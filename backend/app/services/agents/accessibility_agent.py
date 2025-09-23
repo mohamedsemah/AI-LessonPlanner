@@ -4,6 +4,10 @@ from typing import Dict, Any, List, Optional
 from openai import AsyncOpenAI
 from .base_agent import BaseAgent
 from ...models.gagne_slides import SlideContent
+from ...models.accessibility_content import (
+    AccessibilityComplianceReport, WCAGPrinciple, AccessibilityRecommendation,
+    WCAGPrincipleType, WCAGLevel, AccessibilityComplianceLevel, AccessibilityRecommendationPriority
+)
 
 logger = logging.getLogger(__name__)
 
@@ -113,14 +117,14 @@ class AccessibilityAgent(BaseAgent):
                 }
             }
             
-            self._log_processing_success(f"Accessibility validation completed - Overall score: {accessibility_compliance_report['overall_score']:.2f}")
+            self._log_processing_success(f"Accessibility validation completed - Overall score: {accessibility_compliance_report.overall_score:.2f}")
             return self._create_success_response(result)
             
         except Exception as e:
             self._log_processing_error(e)
             return self._create_error_response(e)
     
-    async def _validate_wcag_compliance(self, slides: List[Dict[str, Any]], accessibility_level: str) -> Dict[str, Any]:
+    async def _validate_wcag_compliance(self, slides: List[Dict[str, Any]], accessibility_level: str) -> AccessibilityComplianceReport:
         """Validate slides against WCAG 2.2 compliance."""
         try:
             perceivable_score = await self._validate_perceivable(slides, accessibility_level)
@@ -131,48 +135,85 @@ class AccessibilityAgent(BaseAgent):
             # Calculate overall score
             overall_score = (perceivable_score + operable_score + understandable_score + robust_score) / 4
             
-            return {
-                "perceivable_score": perceivable_score,
-                "operable_score": operable_score,
-                "understandable_score": understandable_score,
-                "robust_score": robust_score,
-                "overall_score": overall_score,
-                "wcag_level": accessibility_level,
-                "principles": {
-                    "perceivable": {
-                        "score": perceivable_score,
-                        "status": "pass" if perceivable_score >= 0.7 else "fail",
-                        "details": "Information and UI components must be presentable in ways users can perceive"
-                    },
-                    "operable": {
-                        "score": operable_score,
-                        "status": "pass" if operable_score >= 0.7 else "fail",
-                        "details": "UI components and navigation must be operable"
-                    },
-                    "understandable": {
-                        "score": understandable_score,
-                        "status": "pass" if understandable_score >= 0.7 else "fail",
-                        "details": "Information and UI operation must be understandable"
-                    },
-                    "robust": {
-                        "score": robust_score,
-                        "status": "pass" if robust_score >= 0.7 else "fail",
-                        "details": "Content must be robust enough for various assistive technologies"
-                    }
-                }
+            # Create principle objects
+            principles = {
+                "perceivable": WCAGPrinciple(
+                    principle=WCAGPrincipleType.PERCEIVABLE,
+                    score=perceivable_score,
+                    status=AccessibilityComplianceLevel.EXCELLENT if perceivable_score >= 0.8 else 
+                           AccessibilityComplianceLevel.GOOD if perceivable_score >= 0.6 else
+                           AccessibilityComplianceLevel.FAIR if perceivable_score >= 0.4 else
+                           AccessibilityComplianceLevel.POOR,
+                    details="Information and UI components must be presentable in ways users can perceive",
+                    violations=[] if perceivable_score >= 0.7 else ["Perceivability issues detected"],
+                    recommendations=[] if perceivable_score >= 0.7 else ["Improve perceivability features"],
+                    success_criteria=[]
+                ),
+                "operable": WCAGPrinciple(
+                    principle=WCAGPrincipleType.OPERABLE,
+                    score=operable_score,
+                    status=AccessibilityComplianceLevel.EXCELLENT if operable_score >= 0.8 else 
+                           AccessibilityComplianceLevel.GOOD if operable_score >= 0.6 else
+                           AccessibilityComplianceLevel.FAIR if operable_score >= 0.4 else
+                           AccessibilityComplianceLevel.POOR,
+                    details="UI components and navigation must be operable",
+                    violations=[] if operable_score >= 0.7 else ["Operability issues detected"],
+                    recommendations=[] if operable_score >= 0.7 else ["Improve operability features"],
+                    success_criteria=[]
+                ),
+                "understandable": WCAGPrinciple(
+                    principle=WCAGPrincipleType.UNDERSTANDABLE,
+                    score=understandable_score,
+                    status=AccessibilityComplianceLevel.EXCELLENT if understandable_score >= 0.8 else 
+                           AccessibilityComplianceLevel.GOOD if understandable_score >= 0.6 else
+                           AccessibilityComplianceLevel.FAIR if understandable_score >= 0.4 else
+                           AccessibilityComplianceLevel.POOR,
+                    details="Information and UI operation must be understandable",
+                    violations=[] if understandable_score >= 0.7 else ["Understandability issues detected"],
+                    recommendations=[] if understandable_score >= 0.7 else ["Improve understandability features"],
+                    success_criteria=[]
+                ),
+                "robust": WCAGPrinciple(
+                    principle=WCAGPrincipleType.ROBUST,
+                    score=robust_score,
+                    status=AccessibilityComplianceLevel.EXCELLENT if robust_score >= 0.8 else 
+                           AccessibilityComplianceLevel.GOOD if robust_score >= 0.6 else
+                           AccessibilityComplianceLevel.FAIR if robust_score >= 0.4 else
+                           AccessibilityComplianceLevel.POOR,
+                    details="Content must be robust enough for various assistive technologies",
+                    violations=[] if robust_score >= 0.7 else ["Robustness issues detected"],
+                    recommendations=[] if robust_score >= 0.7 else ["Improve robustness features"],
+                    success_criteria=[]
+                )
             }
+            
+            return AccessibilityComplianceReport(
+                perceivable_score=perceivable_score,
+                operable_score=operable_score,
+                understandable_score=understandable_score,
+                robust_score=robust_score,
+                overall_score=overall_score,
+                wcag_level=WCAGLevel(accessibility_level),
+                principles=principles,
+                recommendations=[],
+                violations=[],
+                metadata={"total_slides": len(slides)}
+            )
             
         except Exception as e:
             self.logger.error(f"Error validating WCAG compliance: {str(e)}")
-            return {
-                "perceivable_score": 0.0,
-                "operable_score": 0.0,
-                "understandable_score": 0.0,
-                "robust_score": 0.0,
-                "overall_score": 0.0,
-                "wcag_level": accessibility_level,
-                "error": str(e)
-            }
+            return AccessibilityComplianceReport(
+                perceivable_score=0.0,
+                operable_score=0.0,
+                understandable_score=0.0,
+                robust_score=0.0,
+                overall_score=0.0,
+                wcag_level=WCAGLevel(accessibility_level),
+                principles={},
+                recommendations=[],
+                violations=[],
+                metadata={"error": str(e)}
+            )
     
     async def _validate_perceivable(self, slides: List[Dict[str, Any]], accessibility_level: str) -> float:
         """Validate perceivable principle (WCAG 1.1-1.4)."""
@@ -346,12 +387,12 @@ class AccessibilityAgent(BaseAgent):
             self.logger.error(f"Error validating robust: {str(e)}")
             return 0.0
     
-    def _generate_accessibility_recommendations(self, slides: List[Dict[str, Any]], compliance_report: Dict[str, Any]) -> List[str]:
+    def _generate_accessibility_recommendations(self, slides: List[Dict[str, Any]], compliance_report: AccessibilityComplianceReport) -> List[str]:
         """Generate accessibility improvement recommendations."""
         recommendations = []
         
         # Perceivable recommendations
-        if compliance_report.get("perceivable_score", 0) < 0.7:
+        if compliance_report.perceivable_score < 0.7:
             recommendations.extend([
                 "Add alt text to all images and visual elements",
                 "Ensure color contrast meets WCAG AA standards (4.5:1 for normal text)",
@@ -361,7 +402,7 @@ class AccessibilityAgent(BaseAgent):
             ])
         
         # Operable recommendations
-        if compliance_report.get("operable_score", 0) < 0.7:
+        if compliance_report.operable_score < 0.7:
             recommendations.extend([
                 "Ensure all interactive elements are keyboard accessible",
                 "Provide visible focus indicators for keyboard navigation",
@@ -371,7 +412,7 @@ class AccessibilityAgent(BaseAgent):
             ])
         
         # Understandable recommendations
-        if compliance_report.get("understandable_score", 0) < 0.7:
+        if compliance_report.understandable_score < 0.7:
             recommendations.extend([
                 "Use clear, simple language appropriate for the audience",
                 "Provide consistent navigation and interface elements",
@@ -381,7 +422,7 @@ class AccessibilityAgent(BaseAgent):
             ])
         
         # Robust recommendations
-        if compliance_report.get("robust_score", 0) < 0.7:
+        if compliance_report.robust_score < 0.7:
             recommendations.extend([
                 "Use valid, semantic HTML markup",
                 "Ensure compatibility with assistive technologies",

@@ -532,7 +532,7 @@ CRITICAL: Return ONLY the JSON array, no markdown, no code blocks, no explanatio
             visual_elements = []
             for element_data in slide_data.get("visual_elements", []):
                 element = VisualElement(
-                    type=VisualElementType(element_data.get("type", "image")),
+                    type=self._validate_visual_element_type(element_data.get("type", "image")),
                     url=element_data.get("url", ""),
                     alt_text=element_data.get("alt_text", ""),
                     description=element_data.get("description", ""),
@@ -558,13 +558,77 @@ CRITICAL: Return ONLY the JSON array, no markdown, no code blocks, no explanatio
                 assessment_criteria=slide_data.get("assessment_criteria"),
                 accessibility_features=slide_data.get("accessibility_features", []),
                 udl_guidelines=slide_data.get("udl_guidelines", []),
-                difficulty_level=slide_data.get("difficulty_level", "intermediate"),
+                difficulty_level=self._validate_difficulty_level(slide_data.get("difficulty_level", "intermediate")),
                 estimated_reading_time=int(slide_data.get("estimated_reading_time", 2)) if slide_data.get("estimated_reading_time") else None
             )
             
         except Exception as e:
             self.logger.error(f"Error creating slide object: {str(e)}")
             return self._create_basic_slide(slide_number, "Unknown Event")
+    
+    def _validate_difficulty_level(self, difficulty_level: str) -> str:
+        """Validate and map difficulty level to valid values"""
+        if not difficulty_level:
+            return "intermediate"
+        
+        # Convert to lowercase for case-insensitive matching
+        level = difficulty_level.lower().strip()
+        
+        # Map common variations to valid values
+        difficulty_mapping = {
+            "introductory": "beginner",
+            "intro": "beginner", 
+            "basic": "beginner",
+            "easy": "beginner",
+            "simple": "beginner",
+            "intermediate": "intermediate",
+            "medium": "intermediate",
+            "moderate": "intermediate",
+            "advanced": "advanced",
+            "expert": "advanced",
+            "hard": "advanced",
+            "complex": "advanced"
+        }
+        
+        # Return mapped value or default to intermediate
+        return difficulty_mapping.get(level, "intermediate")
+    
+    def _validate_visual_element_type(self, element_type: str) -> VisualElementType:
+        """Validate and map visual element type to valid values"""
+        if not element_type:
+            return VisualElementType.IMAGE
+        
+        # Convert to lowercase for case-insensitive matching
+        element_type = element_type.lower().strip()
+        
+        # Map common variations to valid values
+        type_mapping = {
+            "image": VisualElementType.IMAGE,
+            "img": VisualElementType.IMAGE,
+            "picture": VisualElementType.IMAGE,
+            "photo": VisualElementType.IMAGE,
+            "diagram": VisualElementType.IMAGE,
+            "chart": VisualElementType.IMAGE,
+            "graph": VisualElementType.IMAGE,
+            "flowchart": VisualElementType.IMAGE,  # Map flowchart to image
+            "infographic": VisualElementType.IMAGE,
+            "illustration": VisualElementType.IMAGE,
+            "video": VisualElementType.VIDEO,
+            "mp4": VisualElementType.VIDEO,
+            "mov": VisualElementType.VIDEO,
+            "avi": VisualElementType.VIDEO,
+            "interactive": VisualElementType.INTERACTIVE,
+            "widget": VisualElementType.INTERACTIVE,
+            "animation": VisualElementType.INTERACTIVE,
+            "gif": VisualElementType.INTERACTIVE,
+            "audio": VisualElementType.INTERACTIVE,  # Map audio to interactive since AUDIO is not in enum
+            "sound": VisualElementType.INTERACTIVE,
+            "mp3": VisualElementType.INTERACTIVE,
+            "wav": VisualElementType.INTERACTIVE
+        }
+        
+        # Return mapped value or default to image
+        return type_mapping.get(element_type, VisualElementType.IMAGE)
     
     def _create_fallback_slides(
         self, 

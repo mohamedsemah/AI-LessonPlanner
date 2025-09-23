@@ -306,12 +306,19 @@ class UDLAgent(BaseAgent):
             self.logger.error(f"Error generating UDL recommendations: {str(e)}")
             return ["Ensure all UDL principles are properly implemented"]
     
-    def _extract_accessibility_features(self, slides: List[SlideContent]) -> List[str]:
+    def _extract_accessibility_features(self, slides: List[Any]) -> List[str]:
         """Extract all accessibility features from slides"""
         try:
             features = set()
             for slide in slides:
-                features.update(slide.accessibility_features)
+                # Handle both dictionary and object inputs
+                if isinstance(slide, dict):
+                    slide_features = slide.get("accessibility_features", [])
+                else:
+                    slide_features = getattr(slide, "accessibility_features", [])
+                
+                if slide_features:
+                    features.update(slide_features)
             return list(features)
         except Exception as e:
             self.logger.error(f"Error extracting accessibility features: {str(e)}")
