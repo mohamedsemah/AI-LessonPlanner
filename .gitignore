@@ -159,3 +159,5 @@ celerybeat.pid
 # Local development
 *.sqlite3
 *.db
+
+repo-backup.git/
