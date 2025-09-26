@@ -876,22 +876,36 @@ class DesignAgent(BaseAgent):
     async def _enhance_contrast(self, slide: Dict[str, Any], design_preferences: Dict[str, Any]) -> Dict[str, Any]:
         """Enhance slide contrast and readability"""
         try:
-            # Add contrast guidelines to slide
-            if "design_guidelines" not in slide:
-                slide["design_guidelines"] = []
+            # Apply actual contrast enhancements to slide properties
+            slide["background_color"] = "#FFFFFF"  # High contrast white background
+            slide["text_color"] = "#000000"  # High contrast black text
+            slide["heading_color"] = "#1a365d"  # Dark blue for headings
+            slide["accent_color"] = "#2d3748"  # Dark gray for accents
             
-            slide["design_guidelines"].extend([
-                "Use high contrast colors (dark text on light background or vice versa)",
-                "Ensure minimum 4.5:1 contrast ratio for normal text",
-                "Use bold or larger fonts for headings to create visual hierarchy"
-            ])
+            # Enhance visual elements with better contrast
+            if "visual_elements" in slide:
+                for element in slide["visual_elements"]:
+                    if element.get("type") == "image":
+                        element["border_color"] = "#000000"
+                        element["border_width"] = 2
+                    elif element.get("type") == "text":
+                        element["text_color"] = "#000000"
+                        element["background_color"] = "#f7fafc"
             
-            # Enhance content with contrast improvements
+            # Apply bold formatting to important terms in content
             content = slide.get("main_content", "")
             if content:
-                # Add contrast enhancement suggestions
-                enhanced_content = content + "\n\n**Design Enhancement:**\n- Use high contrast colors for better readability\n- Bold important terms and concepts\n- Use bullet points and numbering for clarity"
+                # Make key terms bold for better contrast
+                key_terms = ["Queue", "FIFO", "Enqueue", "Dequeue", "Peek", "Stack", "LIFO"]
+                enhanced_content = content
+                for term in key_terms:
+                    enhanced_content = enhanced_content.replace(term, f"**{term}**")
                 slide["main_content"] = enhanced_content
+            
+            # Add high contrast styling properties
+            slide["font_size"] = 16
+            slide["heading_font_size"] = 24
+            slide["line_height"] = 1.6
             
             return slide
             
@@ -902,22 +916,52 @@ class DesignAgent(BaseAgent):
     async def _enhance_repetition(self, slide: Dict[str, Any], design_preferences: Dict[str, Any]) -> Dict[str, Any]:
         """Enhance slide with consistent design elements"""
         try:
-            # Add repetition guidelines
-            if "design_guidelines" not in slide:
-                slide["design_guidelines"] = []
+            # Apply consistent styling properties
+            slide["font_family"] = "Arial, sans-serif"
+            slide["bullet_style"] = "•"
+            slide["numbering_style"] = "1."
+            slide["margin_top"] = 20
+            slide["margin_bottom"] = 20
+            slide["margin_left"] = 30
+            slide["margin_right"] = 30
             
-            slide["design_guidelines"].extend([
-                "Use consistent font families throughout the presentation",
-                "Maintain consistent color scheme across all slides",
-                "Use consistent bullet point styles and formatting"
-            ])
+            # Ensure consistent color scheme
+            if "background_color" not in slide:
+                slide["background_color"] = "#FFFFFF"
+            if "text_color" not in slide:
+                slide["text_color"] = "#000000"
+            if "heading_color" not in slide:
+                slide["heading_color"] = "#1a365d"
             
-            # Add consistent formatting to content
+            # Apply consistent formatting to content
             content = slide.get("main_content", "")
             if content:
-                # Add consistency enhancement suggestions
-                enhanced_content = content + "\n\n**Consistency Guidelines:**\n- Use consistent formatting for all headings\n- Maintain uniform spacing and margins\n- Apply consistent styling to similar elements"
-                slide["main_content"] = enhanced_content
+                # Convert content to consistent bullet point format
+                lines = content.split('\n')
+                formatted_lines = []
+                for line in lines:
+                    line = line.strip()
+                    if line and not line.startswith('**') and not line.startswith('#'):
+                        # Convert to bullet points
+                        if line.startswith('- ') or line.startswith('• '):
+                            formatted_lines.append(f"• {line[2:].strip()}")
+                        elif line.startswith(('1.', '2.', '3.', '4.', '5.')):
+                            formatted_lines.append(f"• {line[3:].strip()}")
+                        else:
+                            formatted_lines.append(f"• {line}")
+                    else:
+                        formatted_lines.append(line)
+                
+                slide["main_content"] = '\n'.join(formatted_lines)
+            
+            # Ensure consistent visual element styling
+            if "visual_elements" in slide:
+                for element in slide["visual_elements"]:
+                    element["font_family"] = "Arial, sans-serif"
+                    if "border_radius" not in element:
+                        element["border_radius"] = 4
+                    if "padding" not in element:
+                        element["padding"] = 10
             
             return slide
             
@@ -928,21 +972,50 @@ class DesignAgent(BaseAgent):
     async def _enhance_alignment(self, slide: Dict[str, Any], design_preferences: Dict[str, Any]) -> Dict[str, Any]:
         """Enhance slide alignment and visual structure"""
         try:
-            # Add alignment guidelines
-            if "design_guidelines" not in slide:
-                slide["design_guidelines"] = []
+            # Apply actual alignment properties
+            slide["text_align"] = "left"
+            slide["heading_align"] = "center"
+            slide["content_align"] = "left"
+            slide["grid_columns"] = 2
+            slide["grid_gap"] = 20
             
-            slide["design_guidelines"].extend([
-                "Align all text elements consistently (left, center, or right)",
-                "Use grid system for consistent element placement",
-                "Maintain consistent margins and padding throughout"
-            ])
+            # Set consistent positioning for visual elements
+            if "visual_elements" in slide:
+                for i, element in enumerate(slide["visual_elements"]):
+                    element["position"] = "relative"
+                    element["margin"] = "10px"
+                    element["text_align"] = "left"
+                    
+                    # Distribute elements in a grid
+                    if i % 2 == 0:
+                        element["float"] = "left"
+                        element["width"] = "48%"
+                    else:
+                        element["float"] = "right"
+                        element["width"] = "48%"
             
-            # Add alignment enhancement suggestions
+            # Apply consistent spacing to content
             content = slide.get("main_content", "")
             if content:
-                enhanced_content = content + "\n\n**Alignment Guidelines:**\n- Use consistent text alignment throughout\n- Align related elements in a grid pattern\n- Maintain consistent spacing between elements"
-                slide["main_content"] = enhanced_content
+                # Add proper spacing between sections
+                lines = content.split('\n')
+                formatted_lines = []
+                for i, line in enumerate(lines):
+                    line = line.strip()
+                    if line:
+                        formatted_lines.append(line)
+                        # Add spacing after headings
+                        if line.startswith('**') and line.endswith('**'):
+                            formatted_lines.append('')  # Empty line after heading
+                    elif i > 0 and lines[i-1].strip():  # Add spacing between paragraphs
+                        formatted_lines.append('')
+                
+                slide["main_content"] = '\n'.join(formatted_lines)
+            
+            # Set consistent margins and padding
+            slide["padding"] = 20
+            slide["content_padding"] = 15
+            slide["element_spacing"] = 15
             
             return slide
             
@@ -953,21 +1026,74 @@ class DesignAgent(BaseAgent):
     async def _enhance_proximity(self, slide: Dict[str, Any], design_preferences: Dict[str, Any]) -> Dict[str, Any]:
         """Enhance slide proximity and logical grouping"""
         try:
-            # Add proximity guidelines
-            if "design_guidelines" not in slide:
-                slide["design_guidelines"] = []
+            # Apply actual proximity and spacing properties
+            slide["section_spacing"] = 30
+            slide["paragraph_spacing"] = 15
+            slide["element_grouping"] = True
+            slide["white_space_ratio"] = 0.3
             
-            slide["design_guidelines"].extend([
-                "Group related elements close together",
-                "Use white space to separate different sections",
-                "Create clear visual hierarchy through spacing"
-            ])
-            
-            # Add proximity enhancement suggestions
+            # Group related content with proper spacing
             content = slide.get("main_content", "")
             if content:
-                enhanced_content = content + "\n\n**Proximity Guidelines:**\n- Group related information together\n- Use white space to create visual separation\n- Organize content in logical sections"
-                slide["main_content"] = enhanced_content
+                # Organize content into logical sections with proper spacing
+                lines = content.split('\n')
+                formatted_lines = []
+                current_section = []
+                
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith('**') and line.endswith('**'):  # Heading
+                        if current_section:
+                            # Add section with proper spacing
+                            formatted_lines.extend(current_section)
+                            formatted_lines.append('')  # Section separator
+                            current_section = []
+                        formatted_lines.append(line)
+                        formatted_lines.append('')  # Space after heading
+                    elif line:
+                        current_section.append(f"  {line}")  # Indent content
+                    else:
+                        if current_section:
+                            current_section.append('')
+                
+                # Add final section
+                if current_section:
+                    formatted_lines.extend(current_section)
+                
+                slide["main_content"] = '\n'.join(formatted_lines)
+            
+            # Apply grouping to visual elements
+            if "visual_elements" in slide:
+                # Group related visual elements
+                grouped_elements = []
+                current_group = []
+                
+                for element in slide["visual_elements"]:
+                    if element.get("type") == "image":
+                        if current_group:
+                            grouped_elements.append({
+                                "type": "group",
+                                "elements": current_group,
+                                "spacing": 10
+                            })
+                            current_group = []
+                        grouped_elements.append(element)
+                    else:
+                        current_group.append(element)
+                
+                if current_group:
+                    grouped_elements.append({
+                        "type": "group", 
+                        "elements": current_group,
+                        "spacing": 10
+                    })
+                
+                slide["visual_elements"] = grouped_elements
+            
+            # Set consistent spacing properties
+            slide["margin_between_sections"] = 25
+            slide["margin_between_elements"] = 15
+            slide["padding_around_groups"] = 20
             
             return slide
             

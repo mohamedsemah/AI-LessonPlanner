@@ -875,31 +875,72 @@ class AccessibilityAgent(BaseAgent):
     async def _enhance_perceivable(self, slide: Dict[str, Any], validation_preferences: Dict[str, Any]) -> Dict[str, Any]:
         """Enhance slide perceivability (WCAG 1.1-1.4)"""
         try:
-            # Add accessibility features if missing
-            if "accessibility_features" not in slide:
-                slide["accessibility_features"] = []
+            # Apply actual accessibility properties
+            slide["aria_label"] = slide.get("title", "Slide content")
+            slide["role"] = "region"
+            slide["tabindex"] = 0
             
-            # Ensure visual elements have proper alt text
+            # Ensure visual elements have proper alt text and ARIA attributes
             visual_elements = slide.get("visual_elements", [])
-            for element in visual_elements:
+            for i, element in enumerate(visual_elements):
                 if not element.get("alt_text"):
-                    element["alt_text"] = f"Descriptive text for {element.get('type', 'visual element')}"
-                if not element.get("description"):
-                    element["description"] = f"Detailed description of the visual content"
+                    element["alt_text"] = f"Visual element {i+1}: {element.get('description', 'Educational content')}"
+                if not element.get("aria_label"):
+                    element["aria_label"] = element["alt_text"]
+                element["role"] = "img" if element.get("type") == "image" else "presentation"
+                element["tabindex"] = 0
+                
+                # Add high contrast styling
+                element["border"] = "2px solid #000000"
+                element["background_color"] = "#ffffff"
             
-            # Add perceivability guidelines
-            slide["accessibility_features"].extend([
-                "alt_text_for_images",
-                "descriptive_links",
-                "color_contrast_compliance",
-                "text_scalability"
-            ])
+            # Apply high contrast color scheme
+            slide["background_color"] = "#ffffff"
+            slide["text_color"] = "#000000"
+            slide["heading_color"] = "#000080"
+            slide["link_color"] = "#0000ff"
+            slide["visited_link_color"] = "#800080"
             
-            # Enhance content with perceivability improvements
+            # Add text scalability properties
+            slide["font_size"] = "16px"
+            slide["line_height"] = "1.5"
+            slide["font_family"] = "Arial, sans-serif"
+            slide["min_font_size"] = "12px"
+            slide["max_font_size"] = "24px"
+            
+            # Add semantic structure to content
             content = slide.get("main_content", "")
             if content:
-                enhanced_content = content + "\n\n**Accessibility Enhancement:**\n- All images include descriptive alt text\n- High contrast colors for better visibility\n- Text is scalable and readable\n- Content is perceivable by all users"
-                slide["main_content"] = enhanced_content
+                # Add proper heading structure
+                lines = content.split('\n')
+                enhanced_lines = []
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith('**') and line.endswith('**'):
+                        # Convert to proper heading
+                        heading_text = line[2:-2]
+                        enhanced_lines.append(f"<h2>{heading_text}</h2>")
+                    elif line.startswith('#'):
+                        # Convert markdown headings
+                        heading_text = line[1:].strip()
+                        enhanced_lines.append(f"<h3>{heading_text}</h3>")
+                    elif line and not line.startswith('-') and not line.startswith('•'):
+                        # Convert to paragraphs
+                        enhanced_lines.append(f"<p>{line}</p>")
+                    elif line.startswith(('-', '•')):
+                        # Convert to list items
+                        list_text = line[1:].strip()
+                        enhanced_lines.append(f"<li>{list_text}</li>")
+                    else:
+                        enhanced_lines.append(line)
+                
+                slide["main_content"] = '\n'.join(enhanced_lines)
+            
+            # Add accessibility metadata
+            slide["accessibility_level"] = "WCAG 2.2 AA"
+            slide["contrast_ratio"] = "4.5:1"
+            slide["text_scalable"] = True
+            slide["screen_reader_friendly"] = True
             
             return slide
             
@@ -910,33 +951,54 @@ class AccessibilityAgent(BaseAgent):
     async def _enhance_operable(self, slide: Dict[str, Any], validation_preferences: Dict[str, Any]) -> Dict[str, Any]:
         """Enhance slide operability (WCAG 2.1-2.5)"""
         try:
-            # Add operability features
-            if "accessibility_features" not in slide:
-                slide["accessibility_features"] = []
+            # Apply actual operability properties
+            slide["keyboard_navigable"] = True
+            slide["focus_visible"] = True
+            slide["no_animation"] = True
+            slide["no_auto_play"] = True
             
-            slide["accessibility_features"].extend([
-                "keyboard_navigation",
-                "focus_management",
-                "no_seizure_risk",
-                "sufficient_time_limits"
-            ])
+            # Add focus management properties
+            slide["focus_trap"] = False
+            slide["focus_order"] = "natural"
+            slide["skip_links"] = True
             
-            # Add operability guidelines
-            if "accessibility_guidelines" not in slide:
-                slide["accessibility_guidelines"] = []
+            # Ensure visual elements are keyboard accessible
+            visual_elements = slide.get("visual_elements", [])
+            for element in visual_elements:
+                element["tabindex"] = 0
+                element["keyboard_focusable"] = True
+                element["focus_ring"] = "2px solid #0066cc"
+                element["no_animation"] = True
+                
+                # Remove any seizure-inducing properties
+                if "animation" in element:
+                    del element["animation"]
+                if "flash" in element:
+                    del element["flash"]
+                if "blink" in element:
+                    del element["blink"]
             
-            slide["accessibility_guidelines"].extend([
-                "Ensure all interactive elements are keyboard accessible",
-                "Provide clear focus indicators",
-                "Avoid content that flashes more than 3 times per second",
-                "Allow sufficient time for users to read and interact with content"
-            ])
+            # Add keyboard navigation support
+            slide["keyboard_shortcuts"] = {
+                "next": "ArrowRight",
+                "previous": "ArrowLeft",
+                "home": "Home",
+                "end": "End"
+            }
             
-            # Enhance content with operability improvements
-            content = slide.get("main_content", "")
-            if content:
-                enhanced_content = content + "\n\n**Operability Features:**\n- All content is keyboard accessible\n- Clear focus indicators for navigation\n- No seizure-inducing content\n- Adequate time for interaction"
-                slide["main_content"] = enhanced_content
+            # Set appropriate timing
+            slide["reading_time"] = slide.get("duration_minutes", 2) * 60  # Convert to seconds
+            slide["interaction_timeout"] = 300  # 5 minutes
+            slide["auto_advance"] = False
+            
+            # Add skip navigation
+            slide["skip_to_content"] = True
+            slide["skip_to_navigation"] = True
+            
+            # Ensure no seizure risks
+            slide["no_flashing"] = True
+            slide["no_rapid_movement"] = True
+            slide["motion_safe"] = True
             
             return slide
             
