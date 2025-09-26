@@ -1006,11 +1006,7 @@ class AccessibilityAgent(BaseAgent):
                 "Use familiar UI patterns and conventions"
             ])
             
-            # Enhance content with understandability improvements
-            content = slide.get("main_content", "")
-            if content:
-                enhanced_content = content + "\n\n**Understandability Features:**\n- Clear, simple language throughout\n- Consistent formatting and structure\n- Helpful error messages and guidance\n- Familiar interface patterns"
-                slide["main_content"] = enhanced_content
+            # Don't modify main_content - just add accessibility properties
             
             return slide
             
@@ -1043,11 +1039,7 @@ class AccessibilityAgent(BaseAgent):
                 "Test across different platforms and devices"
             ])
             
-            # Enhance content with robustness improvements
-            content = slide.get("main_content", "")
-            if content:
-                enhanced_content = content + "\n\n**Robustness Features:**\n- Valid, semantic markup structure\n- Compatible with assistive technologies\n- Future-proof design principles\n- Cross-platform compatibility"
-                slide["main_content"] = enhanced_content
+            # Don't modify main_content - just add accessibility properties
             
             return slide
             

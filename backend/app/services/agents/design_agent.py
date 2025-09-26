@@ -903,9 +903,9 @@ class DesignAgent(BaseAgent):
                 slide["main_content"] = enhanced_content
             
             # Add high contrast styling properties
-            slide["font_size"] = 16
-            slide["heading_font_size"] = 24
-            slide["line_height"] = 1.6
+            slide["font_size"] = "16px"
+            slide["heading_font_size"] = "24px"
+            slide["line_height"] = "1.6"
             
             return slide
             
@@ -920,10 +920,10 @@ class DesignAgent(BaseAgent):
             slide["font_family"] = "Arial, sans-serif"
             slide["bullet_style"] = "•"
             slide["numbering_style"] = "1."
-            slide["margin_top"] = 20
-            slide["margin_bottom"] = 20
-            slide["margin_left"] = 30
-            slide["margin_right"] = 30
+            slide["margin_top"] = "20px"
+            slide["margin_bottom"] = "20px"
+            slide["margin_left"] = "30px"
+            slide["margin_right"] = "30px"
             
             # Ensure consistent color scheme
             if "background_color" not in slide:
@@ -976,8 +976,8 @@ class DesignAgent(BaseAgent):
             slide["text_align"] = "left"
             slide["heading_align"] = "center"
             slide["content_align"] = "left"
-            slide["grid_columns"] = 2
-            slide["grid_gap"] = 20
+            slide["grid_columns"] = "2"
+            slide["grid_gap"] = "20px"
             
             # Set consistent positioning for visual elements
             if "visual_elements" in slide:
@@ -1013,9 +1013,9 @@ class DesignAgent(BaseAgent):
                 slide["main_content"] = '\n'.join(formatted_lines)
             
             # Set consistent margins and padding
-            slide["padding"] = 20
-            slide["content_padding"] = 15
-            slide["element_spacing"] = 15
+            slide["padding"] = "20px"
+            slide["content_padding"] = "15px"
+            slide["element_spacing"] = "15px"
             
             return slide
             
@@ -1027,8 +1027,8 @@ class DesignAgent(BaseAgent):
         """Enhance slide proximity and logical grouping"""
         try:
             # Apply actual proximity and spacing properties
-            slide["section_spacing"] = 30
-            slide["paragraph_spacing"] = 15
+            slide["section_spacing"] = "30px"
+            slide["paragraph_spacing"] = "15px"
             slide["element_grouping"] = True
             slide["white_space_ratio"] = 0.3
             
@@ -1071,9 +1071,9 @@ class DesignAgent(BaseAgent):
                     element["grouped"] = True
             
             # Set consistent spacing properties
-            slide["margin_between_sections"] = 25
-            slide["margin_between_elements"] = 15
-            slide["padding_around_groups"] = 20
+            slide["margin_between_sections"] = "25px"
+            slide["margin_between_elements"] = "15px"
+            slide["padding_around_groups"] = "20px"
             
             return slide
             

@@ -54,6 +54,37 @@ class SlideContent(BaseModel):
     udl_guidelines: List[str] = Field(default_factory=list)
     difficulty_level: Literal["beginner", "intermediate", "advanced"] = "intermediate"
     estimated_reading_time: Optional[int] = None  # in minutes
+    
+    # Enhancement properties
+    background_color: Optional[str] = None
+    text_color: Optional[str] = None
+    heading_color: Optional[str] = None
+    accent_color: Optional[str] = None
+    font_family: Optional[str] = None
+    font_size: Optional[str] = None
+    heading_font_size: Optional[str] = None
+    line_height: Optional[str] = None
+    text_align: Optional[str] = None
+    heading_align: Optional[str] = None
+    content_align: Optional[str] = None
+    padding: Optional[str] = None
+    margin_top: Optional[str] = None
+    margin_bottom: Optional[str] = None
+    margin_left: Optional[str] = None
+    margin_right: Optional[str] = None
+    section_spacing: Optional[str] = None
+    paragraph_spacing: Optional[str] = None
+    element_grouping: Optional[bool] = None
+    white_space_ratio: Optional[float] = None
+    grid_columns: Optional[str] = None
+    grid_gap: Optional[str] = None
+    bullet_style: Optional[str] = None
+    numbering_style: Optional[str] = None
+    margin_between_sections: Optional[str] = None
+    margin_between_elements: Optional[str] = None
+    padding_around_groups: Optional[str] = None
+    content_padding: Optional[str] = None
+    element_spacing: Optional[str] = None
 
 
 class GagneEventSlides(BaseModel):
