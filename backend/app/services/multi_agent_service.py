@@ -74,7 +74,7 @@ class MultiAgentService:
                 logger.info("🤖 Calling coordinator.process...")
                 result = await asyncio.wait_for(
                     self.coordinator.process(coordinator_input),
-                    timeout=300  # 5 minute timeout
+                    timeout=600  # 10 minute timeout for enhanced validation
                 )
                 logger.info(f"✅ Coordinator returned: {type(result)}")
                 logger.info(f"📊 Result keys: {result.keys() if isinstance(result, dict) else 'Not a dict'}")
