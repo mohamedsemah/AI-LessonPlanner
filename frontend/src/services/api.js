@@ -4,7 +4,7 @@ import { API_BASE_URL, PREMIUM_API_BASE_URL } from '../utils/constants';
 // Create axios instance for Python backend (lesson planning)
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 600000, // 10 minutes for enhanced AI generation with validation
+  timeout: 1800000, // 30 minutes for enhanced AI generation with validation
   headers: {
     'Content-Type': 'application/json',
   },

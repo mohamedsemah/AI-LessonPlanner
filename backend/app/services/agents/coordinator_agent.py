@@ -98,7 +98,7 @@ class CoordinatorAgent(BaseAgent):
                 self.logger.info("🤖 Calling plan agent...")
                 plan_result = await asyncio.wait_for(
                     self._execute_plan_phase(lesson_request, processed_files),
-                    timeout=300  # 5 minute timeout for plan generation
+                    timeout=600  # 10 minute timeout for plan generation
                 )
                 self.logger.info(f"✅ Plan agent returned: {type(plan_result)}")
                 self.logger.info(f"📊 Plan result keys: {plan_result.keys() if isinstance(plan_result, dict) else 'Not a dict'}")
@@ -145,7 +145,7 @@ class CoordinatorAgent(BaseAgent):
                     self._execute_content_phase(
                         gagne_events, objectives, lesson_plan, lesson_request, processed_files
                     ),
-                    timeout=300  # 5 minute timeout for content generation
+                    timeout=600  # 10 minute timeout for content generation
                 )
                 self.logger.info(f"✅ Content agent returned: {type(content_result)}")
                 self.logger.info(f"📊 Content result keys: {content_result.keys() if isinstance(content_result, dict) else 'Not a dict'}")
@@ -285,7 +285,7 @@ class CoordinatorAgent(BaseAgent):
                 self.logger.info("🤖 Calling UDL agent...")
                 udl_result = await asyncio.wait_for(
                     self._execute_udl_phase(slides, lesson_request, preferences),
-                    timeout=180  # 3 minute timeout for UDL validation
+                    timeout=600  # 10 minute timeout for UDL validation
                 )
                 self.logger.info(f"✅ UDL agent returned: {type(udl_result)}")
             except asyncio.TimeoutError:
@@ -320,7 +320,7 @@ class CoordinatorAgent(BaseAgent):
                 self.logger.info("🤖 Calling design agent...")
                 design_result = await asyncio.wait_for(
                     self._execute_design_phase(slides, preferences),
-                    timeout=180  # 3 minute timeout for design validation
+                    timeout=600  # 10 minute timeout for design validation
                 )
                 self.logger.info(f"✅ Design agent returned: {type(design_result)}")
             except asyncio.TimeoutError:
@@ -353,7 +353,7 @@ class CoordinatorAgent(BaseAgent):
                 self.logger.info("🤖 Calling accessibility agent...")
                 accessibility_result = await asyncio.wait_for(
                     self._execute_accessibility_phase(slides, preferences),
-                    timeout=180  # 3 minute timeout for accessibility validation
+                    timeout=600  # 10 minute timeout for accessibility validation
                 )
                 self.logger.info(f"✅ Accessibility agent returned: {type(accessibility_result)}")
             except asyncio.TimeoutError:

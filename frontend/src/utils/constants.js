@@ -291,7 +291,7 @@ export const STORAGE_KEYS = {
 
 // API configuration
 export const API_CONFIG = {
-  TIMEOUT: 600000,  // 10 minutes for enhanced AI generation with validation
+  TIMEOUT: 1800000,  // 30 minutes for enhanced AI generation with validation
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000,
   PDF_TIMEOUT: 60000  // 1 minute for PDF generation
