@@ -149,10 +149,28 @@ const GagneEventSlideModal = ({ isOpen, onClose, eventSlides }) => {
         </div>
 
         {/* Slide Content */}
-        <div className="p-6 flex-1 overflow-y-auto">
+        <div 
+          className="p-6 flex-1 overflow-y-auto"
+          style={{
+            backgroundColor: currentSlide.background_color || '#ffffff',
+            color: currentSlide.text_color || '#000000',
+            fontFamily: currentSlide.font_family || 'Arial, sans-serif',
+            fontSize: currentSlide.font_size || '16px',
+            lineHeight: currentSlide.line_height || '1.5'
+          }}
+        >
           <div className="max-w-4xl mx-auto pb-8">
             {/* Main Content */}
-            <div className="prose prose-lg max-w-none mb-6 prose-headings:text-gray-900 prose-p:text-gray-700 prose-strong:text-gray-900 prose-ul:text-gray-700 prose-ol:text-gray-700">
+            <div 
+              className="prose prose-lg max-w-none mb-6"
+              style={{
+                '--tw-prose-headings': currentSlide.heading_color || '#1a365d',
+                '--tw-prose-body': currentSlide.text_color || '#000000',
+                '--tw-prose-bold': currentSlide.text_color || '#000000',
+                '--tw-prose-links': currentSlide.link_color || '#0000ff',
+                '--tw-prose-bullets': currentSlide.text_color || '#000000'
+              }}
+            >
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {currentSlide.main_content}
               </ReactMarkdown>
@@ -167,7 +185,20 @@ const GagneEventSlideModal = ({ isOpen, onClose, eventSlides }) => {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {currentSlide.visual_elements.map((element, index) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-4">
+                    <div 
+                      key={index} 
+                      className="rounded-lg p-4"
+                      style={{
+                        border: element.border || '1px solid #e5e7eb',
+                        backgroundColor: element.background_color || '#ffffff',
+                        color: element.text_color || '#000000',
+                        fontFamily: element.font_family || 'Arial, sans-serif',
+                        borderRadius: element.border_radius || '8px',
+                        padding: element.padding || '16px',
+                        margin: element.margin || '0',
+                        textAlign: element.text_align || 'left'
+                      }}
+                    >
                       <div className="flex items-center gap-2 mb-2">
                         <Badge variant="outline" size="sm">
                           {element.type}

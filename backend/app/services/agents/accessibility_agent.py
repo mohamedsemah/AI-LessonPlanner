@@ -908,33 +908,8 @@ class AccessibilityAgent(BaseAgent):
             slide["min_font_size"] = "12px"
             slide["max_font_size"] = "24px"
             
-            # Add semantic structure to content
-            content = slide.get("main_content", "")
-            if content:
-                # Add proper heading structure
-                lines = content.split('\n')
-                enhanced_lines = []
-                for line in lines:
-                    line = line.strip()
-                    if line.startswith('**') and line.endswith('**'):
-                        # Convert to proper heading
-                        heading_text = line[2:-2]
-                        enhanced_lines.append(f"<h2>{heading_text}</h2>")
-                    elif line.startswith('#'):
-                        # Convert markdown headings
-                        heading_text = line[1:].strip()
-                        enhanced_lines.append(f"<h3>{heading_text}</h3>")
-                    elif line and not line.startswith('-') and not line.startswith('•'):
-                        # Convert to paragraphs
-                        enhanced_lines.append(f"<p>{line}</p>")
-                    elif line.startswith(('-', '•')):
-                        # Convert to list items
-                        list_text = line[1:].strip()
-                        enhanced_lines.append(f"<li>{list_text}</li>")
-                    else:
-                        enhanced_lines.append(line)
-                
-                slide["main_content"] = '\n'.join(enhanced_lines)
+            # Don't modify main_content - just add accessibility properties
+            # The frontend will handle content rendering
             
             # Add accessibility metadata
             slide["accessibility_level"] = "WCAG 2.2 AA"
