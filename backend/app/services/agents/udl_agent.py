@@ -198,9 +198,9 @@ class UDLAgent(BaseAgent):
         """Calculate UDL compliance score and provide recommendations"""
         try:
             # Analyze representation
-            representation_score = self._calculate_principle_score(slides, "representation")
-            action_expression_score = self._calculate_principle_score(slides, "action_expression")
-            engagement_score = self._calculate_principle_score(slides, "engagement")
+            representation_score = await self._calculate_principle_score(slides, "representation")
+            action_expression_score = await self._calculate_principle_score(slides, "action_expression")
+            engagement_score = await self._calculate_principle_score(slides, "engagement")
             
             overall_compliance = (representation_score + action_expression_score + engagement_score) / 3
             
@@ -232,7 +232,7 @@ class UDLAgent(BaseAgent):
                 accessibility_features_implemented=[]
             )
     
-    def _calculate_principle_score(self, slides: List[SlideContent], principle: str) -> float:
+    async def _calculate_principle_score(self, slides: List[SlideContent], principle: str) -> float:
         """Calculate compliance score for a UDL principle with AI-powered analysis"""
         try:
             if principle not in self.udl_guidelines:
@@ -245,7 +245,7 @@ class UDLAgent(BaseAgent):
                 return 0.5
                 
             # Use AI-powered analysis for more accurate scoring
-            return asyncio.run(self._analyze_udl_principle_with_ai(slides, principle, principle_data))
+            return await self._analyze_udl_principle_with_ai(slides, principle, principle_data)
         except Exception as e:
             self.logger.error(f"Error calculating principle score for {principle}: {str(e)}")
             return 0.5

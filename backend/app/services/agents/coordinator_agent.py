@@ -378,6 +378,34 @@ class CoordinatorAgent(BaseAgent):
                     else:
                         self.logger.info("✅ Accessibility phase succeeded")
             
+            # Update the main slides response with enhanced slides
+            self.logger.info("🔍 Integrating enhanced slides into main response...")
+            
+            # Update the slides_response with enhanced slides
+            if hasattr(slides_response, 'events') and slides:
+                self.logger.info(f"Updating {len(slides_response.events)} events with enhanced slides")
+                
+                # Flatten all enhanced slides
+                all_enhanced_slides = []
+                for slide_dict in slides:
+                    if isinstance(slide_dict, dict):
+                        all_enhanced_slides.append(slide_dict)
+                    else:
+                        all_enhanced_slides.append(slide_dict.dict() if hasattr(slide_dict, 'dict') else slide_dict)
+                
+                # Distribute enhanced slides to events
+                slide_index = 0
+                for event in slides_response.events:
+                    if slide_index < len(all_enhanced_slides):
+                        # Update the event's slides with enhanced versions
+                        event_slides = []
+                        for _ in range(len(event.slides)):
+                            if slide_index < len(all_enhanced_slides):
+                                event_slides.append(all_enhanced_slides[slide_index])
+                                slide_index += 1
+                        event.slides = event_slides
+                        self.logger.info(f"Updated event '{event.event_name}' with {len(event_slides)} enhanced slides")
+            
             # Aggregate results
             self.logger.info("🔍 Aggregating results...")
             result = {
