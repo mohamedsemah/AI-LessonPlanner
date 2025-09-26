@@ -277,9 +277,9 @@ class CoordinatorAgent(BaseAgent):
                 self.logger.error(f"📜 Traceback: {traceback.format_exc()}")
                 raise Exception(f"Failed to create content objects: {str(e)}")
             
-            # Phase 3: UDL Validation
+            # Phase 3: UDL Enhancement
             self.logger.info("=" * 60)
-            self.logger.info("♿ PHASE 3: UDL VALIDATION")
+            self.logger.info("♿ PHASE 3: UDL ENHANCEMENT")
             self.logger.info("=" * 60)
             try:
                 self.logger.info("🤖 Calling UDL agent...")
@@ -305,11 +305,16 @@ class CoordinatorAgent(BaseAgent):
                     udl_data = self._create_fallback_udl_compliance(slides)
                 else:
                     udl_data = udl_result["data"]
-                    self.logger.info("✅ UDL phase succeeded")
+                    # Update slides with UDL enhancements
+                    if "enhanced_slides" in udl_data:
+                        slides = udl_data["enhanced_slides"]
+                        self.logger.info("✅ UDL phase succeeded - slides enhanced with UDL principles")
+                    else:
+                        self.logger.info("✅ UDL phase succeeded")
             
-            # Phase 4: Design Validation
+            # Phase 4: Design Enhancement
             self.logger.info("=" * 60)
-            self.logger.info("🎨 PHASE 4: DESIGN VALIDATION")
+            self.logger.info("🎨 PHASE 4: DESIGN ENHANCEMENT")
             self.logger.info("=" * 60)
             try:
                 self.logger.info("🤖 Calling design agent...")
@@ -333,11 +338,16 @@ class CoordinatorAgent(BaseAgent):
                     design_data = self._create_fallback_design_compliance(slides)
                 else:
                     design_data = design_result["data"]
-                    self.logger.info("✅ Design phase succeeded")
+                    # Update slides with design enhancements
+                    if "enhanced_slides" in design_data:
+                        slides = design_data["enhanced_slides"]
+                        self.logger.info("✅ Design phase succeeded - slides enhanced with C.R.A.P. principles")
+                    else:
+                        self.logger.info("✅ Design phase succeeded")
             
-            # Phase 5: Accessibility Validation
+            # Phase 5: Accessibility Enhancement
             self.logger.info("=" * 60)
-            self.logger.info("♿ PHASE 5: ACCESSIBILITY VALIDATION")
+            self.logger.info("♿ PHASE 5: ACCESSIBILITY ENHANCEMENT")
             self.logger.info("=" * 60)
             try:
                 self.logger.info("🤖 Calling accessibility agent...")
@@ -361,7 +371,12 @@ class CoordinatorAgent(BaseAgent):
                     accessibility_data = self._create_fallback_accessibility_compliance(slides)
                 else:
                     accessibility_data = accessibility_result["data"]
-                    self.logger.info("✅ Accessibility phase succeeded")
+                    # Update slides with accessibility enhancements
+                    if "enhanced_slides" in accessibility_data:
+                        slides = accessibility_data["enhanced_slides"]
+                        self.logger.info("✅ Accessibility phase succeeded - slides enhanced with WCAG 2.2 principles")
+                    else:
+                        self.logger.info("✅ Accessibility phase succeeded")
             
             # Aggregate results
             self.logger.info("🔍 Aggregating results...")
@@ -373,12 +388,13 @@ class CoordinatorAgent(BaseAgent):
                 },
                 "content": {
                     "gagne_slides_response": slides_response.dict(),
+                    "enhanced_slides": slides,  # Include the final enhanced slides
                     "total_slides": slides_response.total_slides,
                     "total_duration": slides_response.total_duration
                 },
-                "udl_compliance": udl_data["udl_compliance_report"].dict() if hasattr(udl_data["udl_compliance_report"], 'dict') else udl_data["udl_compliance_report"],
-                "design_compliance": design_data["design_compliance_report"].dict() if hasattr(design_data["design_compliance_report"], 'dict') else design_data["design_compliance_report"],
-                "accessibility_compliance": accessibility_data["accessibility_compliance_report"].dict() if hasattr(accessibility_data["accessibility_compliance_report"], 'dict') else accessibility_data["accessibility_compliance_report"],
+                "udl_compliance": udl_data["udl_compliance_report"],
+                "design_compliance": design_data["design_compliance_report"],
+                "accessibility_compliance": accessibility_data["accessibility_compliance_report"],
                 "recommendations": udl_data.get("recommendations", []),
                 "design_recommendations": design_data.get("recommendations", []),
                 "accessibility_recommendations": accessibility_data.get("recommendations", []),
@@ -681,8 +697,16 @@ class CoordinatorAgent(BaseAgent):
     ) -> Dict[str, Any]:
         """Execute the design validation phase using Design Agent"""
         try:
+            # Convert slides to dictionaries if they are objects
+            slide_dicts = []
+            for slide in slides:
+                if isinstance(slide, dict):
+                    slide_dicts.append(slide)
+                else:
+                    slide_dicts.append(slide.dict())
+            
             design_input = {
-                "slides": [slide.dict() for slide in slides],
+                "slides": slide_dicts,
                 "design_preferences": preferences.get("design", {}),
                 "validation_level": preferences.get("design_level", "standard")
             }
@@ -700,8 +724,16 @@ class CoordinatorAgent(BaseAgent):
     ) -> Dict[str, Any]:
         """Execute the accessibility validation phase using Accessibility Agent"""
         try:
+            # Convert slides to dictionaries if they are objects
+            slide_dicts = []
+            for slide in slides:
+                if isinstance(slide, dict):
+                    slide_dicts.append(slide)
+                else:
+                    slide_dicts.append(slide.dict())
+            
             accessibility_input = {
-                "slides": [slide.dict() for slide in slides],
+                "slides": slide_dicts,
                 "accessibility_level": preferences.get("accessibility_level", "AA"),
                 "validation_preferences": preferences.get("accessibility", {})
             }

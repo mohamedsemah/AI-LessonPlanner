@@ -12,6 +12,7 @@ The agent ensures that all generated content adheres to UDL principles and
 provides comprehensive accessibility for diverse learners.
 """
 
+import asyncio
 import json
 import logging
 from typing import Dict, Any, List, Optional
@@ -44,7 +45,7 @@ class UDLAgent(BaseAgent):
     
     async def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Process UDL compliance validation request.
+        Process UDL compliance validation and content enhancement request.
         
         Args:
             input_data: Dictionary containing:
@@ -55,6 +56,7 @@ class UDLAgent(BaseAgent):
         Returns:
             Dictionary containing:
                 - udl_compliance_report: UDLComplianceReport object
+                - enhanced_slides: List of enhanced SlideContent objects
                 - recommendations: List of improvement recommendations
                 - accessibility_features: List of implemented features
                 - metadata: Processing metadata
@@ -80,6 +82,9 @@ class UDLAgent(BaseAgent):
             # Calculate UDL compliance
             udl_compliance_report = await self._calculate_udl_compliance(slide_dicts, lesson_info)
             
+            # Enhance slides with UDL principles
+            enhanced_slides = await self._enhance_slides_with_udl(slide_dicts, udl_compliance_report, lesson_info)
+            
             # Generate recommendations
             recommendations = self._generate_udl_recommendations(slide_dicts, udl_compliance_report.missing_guidelines)
             
@@ -93,6 +98,7 @@ class UDLAgent(BaseAgent):
             
             result = {
                 "udl_compliance_report": udl_compliance_report.dict(),
+                "enhanced_slides": enhanced_slides,
                 "recommendations": recommendations,
                 "accessibility_features": accessibility_features
             }
@@ -227,7 +233,7 @@ class UDLAgent(BaseAgent):
             )
     
     def _calculate_principle_score(self, slides: List[SlideContent], principle: str) -> float:
-        """Calculate compliance score for a UDL principle"""
+        """Calculate compliance score for a UDL principle with AI-powered analysis"""
         try:
             if principle not in self.udl_guidelines:
                 self.logger.warning(f"Principle '{principle}' not found in UDL guidelines")
@@ -238,11 +244,99 @@ class UDLAgent(BaseAgent):
                 self.logger.warning(f"Principle '{principle}' data structure is invalid")
                 return 0.5
                 
-            total_guidelines = len(principle_data[1]["guidelines"])
-            if total_guidelines == 0:
-                self.logger.warning(f"No guidelines found for principle '{principle}'")
-                return 0.5
-                
+            # Use AI-powered analysis for more accurate scoring
+            return asyncio.run(self._analyze_udl_principle_with_ai(slides, principle, principle_data))
+        except Exception as e:
+            self.logger.error(f"Error calculating principle score for {principle}: {str(e)}")
+            return 0.5
+    
+    async def _analyze_udl_principle_with_ai(self, slides: List[SlideContent], principle: str, principle_data: Dict[str, Any]) -> float:
+        """Use AI to analyze UDL principle compliance"""
+        try:
+            # Prepare content for AI analysis
+            slide_contents = []
+            for slide in slides:
+                slide_content = {
+                    "title": slide.get("title", ""),
+                    "main_content": slide.get("main_content", ""),
+                    "visual_elements": slide.get("visual_elements", []),
+                    "activities": slide.get("activities", []),
+                    "audio_script": slide.get("audio_script", ""),
+                    "udl_guidelines": slide.get("udl_guidelines", [])
+                }
+                slide_contents.append(slide_content)
+            
+            # Create AI prompt for UDL analysis
+            prompt = f"""
+            Analyze the following educational slides for UDL (Universal Design for Learning) compliance for the principle: {principle}
+            
+            UDL Principle: {principle_data[1]["name"]}
+            Guidelines: {list(principle_data[1]["guidelines"].keys())}
+            
+            Slide Content:
+            {self._format_slides_for_ai_analysis(slide_contents)}
+            
+            Please analyze each slide and provide a compliance score (0.0 to 1.0) for the {principle} principle based on:
+            1. Content representation diversity
+            2. Engagement strategies
+            3. Action and expression opportunities
+            4. Accessibility features
+            
+            Return only a JSON object with:
+            {{
+                "overall_score": 0.0-1.0,
+                "detailed_analysis": {{
+                    "representation_score": 0.0-1.0,
+                    "engagement_score": 0.0-1.0,
+                    "action_expression_score": 0.0-1.0,
+                    "accessibility_score": 0.0-1.0
+                }},
+                "recommendations": ["specific improvement suggestions"],
+                "strengths": ["identified strengths"]
+            }}
+            """
+            
+            response = await self._call_openai(
+                messages=[
+                    {"role": "system", "content": "You are an expert in Universal Design for Learning (UDL) principles. Analyze educational content for UDL compliance and provide detailed scores and recommendations."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=1000
+            )
+            
+            # Parse AI response
+            analysis_result = self._parse_json_response(response, "object")
+            return analysis_result.get("overall_score", 0.5)
+            
+        except Exception as e:
+            self.logger.error(f"Error in AI-powered UDL analysis: {str(e)}")
+            # Fallback to basic analysis
+            return self._calculate_basic_principle_score(slides, principle)
+    
+    def _format_slides_for_ai_analysis(self, slides: List[Dict[str, Any]]) -> str:
+        """Format slides for AI analysis"""
+        try:
+            formatted_slides = []
+            for i, slide in enumerate(slides, 1):
+                slide_text = f"Slide {i}: {slide.get('title', 'Untitled')}\n"
+                slide_text += f"Content: {slide.get('main_content', '')[:500]}...\n"
+                slide_text += f"Visual Elements: {len(slide.get('visual_elements', []))} elements\n"
+                slide_text += f"Activities: {slide.get('activities', [])}\n"
+                slide_text += f"UDL Guidelines: {slide.get('udl_guidelines', [])}\n"
+                slide_text += "---\n"
+                formatted_slides.append(slide_text)
+            
+            return "\n".join(formatted_slides)
+            
+        except Exception as e:
+            self.logger.error(f"Error formatting slides for AI analysis: {str(e)}")
+            return "Error formatting slides for analysis"
+    
+    def _calculate_basic_principle_score(self, slides: List[SlideContent], principle: str) -> float:
+        """Fallback basic calculation for UDL principle score"""
+        try:
+            total_guidelines = 4  # Basic guideline count
             implemented_guidelines = 0
             
             for slide in slides:
@@ -252,7 +346,7 @@ class UDLAgent(BaseAgent):
             
             return min(1.0, implemented_guidelines / total_guidelines)
         except Exception as e:
-            self.logger.error(f"Error calculating principle score for {principle}: {str(e)}")
+            self.logger.error(f"Error in basic principle score calculation: {str(e)}")
             return 0.5
     
     def _identify_missing_guidelines(self, slides: List[SlideContent]) -> List[str]:
@@ -323,6 +417,134 @@ class UDLAgent(BaseAgent):
         except Exception as e:
             self.logger.error(f"Error extracting accessibility features: {str(e)}")
             return []
+    
+    async def _enhance_slides_with_udl(self, slides: List[Dict[str, Any]], compliance_report: UDLComplianceReport, lesson_info: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Enhance slides with UDL principles based on compliance analysis"""
+        try:
+            enhanced_slides = []
+            
+            for slide in slides:
+                enhanced_slide = slide.copy()
+                
+                # Apply UDL enhancements based on compliance scores
+                if compliance_report.representation_score < 0.7:
+                    enhanced_slide = await self._enhance_representation(enhanced_slide, lesson_info)
+                
+                if compliance_report.action_expression_score < 0.7:
+                    enhanced_slide = await self._enhance_action_expression(enhanced_slide, lesson_info)
+                
+                if compliance_report.engagement_score < 0.7:
+                    enhanced_slide = await self._enhance_engagement(enhanced_slide, lesson_info)
+                
+                # Add UDL guidelines to the slide
+                if "udl_guidelines" not in enhanced_slide:
+                    enhanced_slide["udl_guidelines"] = []
+                
+                # Add specific UDL guidelines based on enhancements
+                udl_guidelines = enhanced_slide["udl_guidelines"]
+                if "multiple_representation" not in udl_guidelines:
+                    udl_guidelines.append("multiple_representation")
+                if "multiple_means_action" not in udl_guidelines:
+                    udl_guidelines.append("multiple_means_action")
+                if "engagement_strategies" not in udl_guidelines:
+                    udl_guidelines.append("engagement_strategies")
+                
+                enhanced_slides.append(enhanced_slide)
+            
+            return enhanced_slides
+            
+        except Exception as e:
+            self.logger.error(f"Error enhancing slides with UDL: {str(e)}")
+            return slides  # Return original slides if enhancement fails
+    
+    async def _enhance_representation(self, slide: Dict[str, Any], lesson_info: Dict[str, Any]) -> Dict[str, Any]:
+        """Enhance slide with multiple means of representation"""
+        try:
+            # Add visual elements if missing
+            if not slide.get("visual_elements"):
+                slide["visual_elements"] = [{
+                    "type": "image",
+                    "url": "",
+                    "alt_text": f"Visual representation for {slide.get('title', 'slide')}",
+                    "description": "Visual aid to support learning",
+                    "position": "center",
+                    "size": "medium"
+                }]
+            
+            # Add audio script if missing
+            if not slide.get("audio_script"):
+                slide["audio_script"] = f"Audio narration for {slide.get('title', 'this slide')} to support auditory learners"
+            
+            # Enhance content with multiple representations
+            content = slide.get("main_content", "")
+            if content and "visual" not in content.lower():
+                # Add visual learning cues
+                enhanced_content = content + "\n\n**Visual Learning Support:**\n- Use diagrams and charts to illustrate concepts\n- Include visual examples and demonstrations"
+                slide["main_content"] = enhanced_content
+            
+            return slide
+            
+        except Exception as e:
+            self.logger.error(f"Error enhancing representation: {str(e)}")
+            return slide
+    
+    async def _enhance_action_expression(self, slide: Dict[str, Any], lesson_info: Dict[str, Any]) -> Dict[str, Any]:
+        """Enhance slide with multiple means of action and expression"""
+        try:
+            # Add interactive activities if missing
+            if not slide.get("activities"):
+                slide["activities"] = [
+                    f"Interactive discussion about {slide.get('title', 'the topic')}",
+                    "Hands-on practice exercise",
+                    "Group collaboration activity"
+                ]
+            
+            # Add assessment criteria if missing
+            if not slide.get("assessment_criteria"):
+                slide["assessment_criteria"] = "Demonstrate understanding through multiple assessment methods: written responses, verbal explanations, and practical demonstrations"
+            
+            # Enhance content with action-oriented elements
+            content = slide.get("main_content", "")
+            if content and "activity" not in content.lower():
+                # Add action-oriented content
+                enhanced_content = content + "\n\n**Action & Expression Opportunities:**\n- Practice exercises and hands-on activities\n- Multiple ways to demonstrate learning\n- Collaborative learning opportunities"
+                slide["main_content"] = enhanced_content
+            
+            return slide
+            
+        except Exception as e:
+            self.logger.error(f"Error enhancing action expression: {str(e)}")
+            return slide
+    
+    async def _enhance_engagement(self, slide: Dict[str, Any], lesson_info: Dict[str, Any]) -> Dict[str, Any]:
+        """Enhance slide with engagement strategies"""
+        try:
+            # Add engagement elements
+            if "engagement" not in slide.get("udl_guidelines", []):
+                if "udl_guidelines" not in slide:
+                    slide["udl_guidelines"] = []
+                slide["udl_guidelines"].append("engagement")
+            
+            # Add motivational content
+            content = slide.get("main_content", "")
+            if content and "motivation" not in content.lower():
+                # Add engagement elements
+                enhanced_content = content + "\n\n**Engagement Strategies:**\n- Connect to real-world applications\n- Provide choice and autonomy in learning\n- Use relevant and meaningful examples"
+                slide["main_content"] = enhanced_content
+            
+            # Add key points if missing
+            if not slide.get("key_points"):
+                slide["key_points"] = [
+                    "Key concept to remember",
+                    "Important takeaway",
+                    "Practical application"
+                ]
+            
+            return slide
+            
+        except Exception as e:
+            self.logger.error(f"Error enhancing engagement: {str(e)}")
+            return slide
     
     async def _refine_content_for_udl(self, refinement_request: Dict[str, Any], slides: List[SlideContent]) -> Dict[str, Any]:
         """Refine content based on UDL principles using AI"""

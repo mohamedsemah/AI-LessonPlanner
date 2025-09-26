@@ -375,6 +375,21 @@ Continue this pattern for all 9 events with pedagogically-appropriate time distr
                 self.logger.warning(f"Only {len(events_data)} events generated, expected 9. Using fallback.")
                 return self._create_fallback_gagne_events(request)
             
+            # Fix validation issues before creating GagneEvent objects
+            for event in events_data:
+                # Fix materials_needed - ensure it's a list
+                if event.get("materials_needed") is None:
+                    event["materials_needed"] = []
+                elif not isinstance(event.get("materials_needed"), list):
+                    event["materials_needed"] = [str(event.get("materials_needed"))]
+                
+                # Fix assessment_strategy - ensure it's a string or None
+                assessment = event.get("assessment_strategy")
+                if isinstance(assessment, list):
+                    event["assessment_strategy"] = "; ".join(assessment) if assessment else None
+                elif assessment is not None and not isinstance(assessment, str):
+                    event["assessment_strategy"] = str(assessment)
+            
             self.logger.info(f"Successfully generated {len(events_data)} Gagne events from AI")
             return [GagneEvent(**event) for event in events_data]
             

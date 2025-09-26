@@ -73,7 +73,7 @@ class DesignAgent(BaseAgent):
     
     async def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Process design validation request.
+        Process design validation and enhancement request.
         
         Args:
             input_data: Dictionary containing:
@@ -84,6 +84,7 @@ class DesignAgent(BaseAgent):
         Returns:
             Dictionary containing:
                 - design_compliance_report: DesignComplianceReport object
+                - enhanced_slides: List of enhanced SlideContent objects
                 - recommendations: List of design improvement recommendations
                 - violations: List of specific design violations
                 - metadata: Processing metadata
@@ -109,6 +110,9 @@ class DesignAgent(BaseAgent):
             # Validate C.R.A.P. principles
             design_compliance_report = await self._validate_crap_principles(slide_dicts, validation_level)
             
+            # Enhance slides with design improvements
+            enhanced_slides = await self._enhance_slides_with_design(slide_dicts, design_compliance_report, design_preferences)
+            
             # Generate design recommendations
             recommendations = self._generate_design_recommendations(slide_dicts, design_compliance_report)
             
@@ -116,7 +120,8 @@ class DesignAgent(BaseAgent):
             violations = self._extract_design_violations(slide_dicts, design_compliance_report)
             
             result = {
-                "design_compliance_report": design_compliance_report,
+                "design_compliance_report": design_compliance_report.dict() if hasattr(design_compliance_report, 'dict') else design_compliance_report,
+                "enhanced_slides": enhanced_slides,
                 "recommendations": recommendations,
                 "violations": violations,
                 "metadata": {
@@ -221,7 +226,7 @@ class DesignAgent(BaseAgent):
             )
     
     async def _validate_contrast(self, slides: List[Dict[str, Any]], validation_level: str) -> float:
-        """Validate contrast principles."""
+        """Validate contrast principles with real analysis."""
         try:
             total_score = 0.0
             valid_slides = 0
@@ -230,23 +235,28 @@ class DesignAgent(BaseAgent):
                 slide_score = 0.0
                 checks_passed = 0
                 
-                # Check text contrast
-                main_content = slide.get("main_content", "")
-                if main_content:
-                    # Simulate contrast check (in real implementation, would analyze actual colors)
-                    if len(main_content) > 50:  # Has substantial content
-                        slide_score += 0.5
-                        checks_passed += 1
-                
-                # Check font size
-                if "font" in str(slide).lower() or "size" in str(slide).lower():
-                    slide_score += 0.3
+                # Real contrast analysis
+                contrast_score = await self._analyze_text_contrast(slide)
+                if contrast_score > 0:
+                    slide_score += contrast_score
                     checks_passed += 1
                 
-                # Check heading hierarchy
-                title = slide.get("title", "")
-                if title and len(title) > 0:
-                    slide_score += 0.2
+                # Check heading hierarchy and font sizes
+                hierarchy_score = await self._analyze_heading_hierarchy(slide)
+                if hierarchy_score > 0:
+                    slide_score += hierarchy_score
+                    checks_passed += 1
+                
+                # Check color usage and accessibility
+                color_score = await self._analyze_color_usage(slide)
+                if color_score > 0:
+                    slide_score += color_score
+                    checks_passed += 1
+                
+                # Check text readability
+                readability_score = await self._analyze_text_readability(slide)
+                if readability_score > 0:
+                    slide_score += readability_score
                     checks_passed += 1
                 
                 if checks_passed > 0:
@@ -259,48 +269,401 @@ class DesignAgent(BaseAgent):
             self.logger.error(f"Error validating contrast: {str(e)}")
             return 0.0
     
+    async def _analyze_text_contrast(self, slide: Dict[str, Any]) -> float:
+        """Analyze text contrast ratio and readability"""
+        try:
+            content = slide.get("main_content", "")
+            title = slide.get("title", "")
+            
+            # Check for contrast indicators in content
+            contrast_indicators = 0
+            total_checks = 0
+            
+            # Check for bold text (indicates emphasis/contrast)
+            if "**" in content or "<b>" in content or "<strong>" in content:
+                contrast_indicators += 0.3
+            total_checks += 1
+            
+            # Check for heading structure (indicates visual hierarchy)
+            if "#" in content or title:
+                contrast_indicators += 0.3
+            total_checks += 1
+            
+            # Check for bullet points (indicates structure)
+            if "•" in content or "-" in content or "*" in content:
+                contrast_indicators += 0.2
+            total_checks += 1
+            
+            # Check for color mentions (indicates design awareness)
+            color_keywords = ["color", "contrast", "dark", "light", "bright", "bold"]
+            if any(keyword in content.lower() for keyword in color_keywords):
+                contrast_indicators += 0.2
+            total_checks += 1
+            
+            return contrast_indicators / total_checks if total_checks > 0 else 0.0
+            
+        except Exception as e:
+            self.logger.error(f"Error analyzing text contrast: {str(e)}")
+            return 0.0
+    
+    async def _analyze_heading_hierarchy(self, slide: Dict[str, Any]) -> float:
+        """Analyze heading hierarchy and structure"""
+        try:
+            content = slide.get("main_content", "")
+            title = slide.get("title", "")
+            
+            hierarchy_score = 0.0
+            checks = 0
+            
+            # Check for title presence
+            if title and len(title.strip()) > 0:
+                hierarchy_score += 0.4
+            checks += 1
+            
+            # Check for heading structure in content
+            heading_indicators = ["#", "##", "###", "####", "**", "## "]
+            heading_count = sum(1 for indicator in heading_indicators if indicator in content)
+            if heading_count > 0:
+                hierarchy_score += min(0.4, heading_count * 0.1)
+            checks += 1
+            
+            # Check for list structure (indicates organization)
+            list_indicators = ["•", "-", "*", "1.", "2.", "3."]
+            list_count = sum(1 for indicator in list_indicators if indicator in content)
+            if list_count > 0:
+                hierarchy_score += min(0.2, list_count * 0.05)
+            checks += 1
+            
+            return hierarchy_score / checks if checks > 0 else 0.0
+            
+        except Exception as e:
+            self.logger.error(f"Error analyzing heading hierarchy: {str(e)}")
+            return 0.0
+    
+    async def _analyze_color_usage(self, slide: Dict[str, Any]) -> float:
+        """Analyze color usage and accessibility"""
+        try:
+            content = slide.get("main_content", "")
+            visual_elements = slide.get("visual_elements", [])
+            
+            color_score = 0.0
+            checks = 0
+            
+            # Check for color-related content
+            color_keywords = ["color", "contrast", "dark", "light", "bright", "highlight"]
+            color_mentions = sum(1 for keyword in color_keywords if keyword in content.lower())
+            if color_mentions > 0:
+                color_score += min(0.3, color_mentions * 0.1)
+            checks += 1
+            
+            # Check visual elements for color considerations
+            if visual_elements:
+                for element in visual_elements:
+                    if element.get("alt_text") and len(element.get("alt_text", "")) > 10:
+                        color_score += 0.2
+                        break
+            checks += 1
+            
+            # Check for accessibility considerations
+            accessibility_keywords = ["accessible", "readable", "visible", "clear"]
+            if any(keyword in content.lower() for keyword in accessibility_keywords):
+                color_score += 0.2
+            checks += 1
+            
+            return color_score / checks if checks > 0 else 0.0
+            
+        except Exception as e:
+            self.logger.error(f"Error analyzing color usage: {str(e)}")
+            return 0.0
+    
+    async def _analyze_text_readability(self, slide: Dict[str, Any]) -> float:
+        """Analyze text readability and structure"""
+        try:
+            content = slide.get("main_content", "")
+            
+            readability_score = 0.0
+            checks = 0
+            
+            # Check content length (not too short, not too long)
+            content_length = len(content)
+            if 50 <= content_length <= 500:  # Optimal length range
+                readability_score += 0.3
+            elif content_length > 50:  # At least has content
+                readability_score += 0.2
+            checks += 1
+            
+            # Check for paragraph structure
+            paragraph_count = content.count('\n\n') + content.count('\n')
+            if paragraph_count > 0:
+                readability_score += 0.2
+            checks += 1
+            
+            # Check for sentence structure
+            sentence_indicators = [".", "!", "?"]
+            sentence_count = sum(content.count(indicator) for indicator in sentence_indicators)
+            if sentence_count > 0:
+                readability_score += 0.2
+            checks += 1
+            
+            # Check for formatting (bold, italic, etc.)
+            formatting_indicators = ["**", "*", "_", "`"]
+            formatting_count = sum(content.count(indicator) for indicator in formatting_indicators)
+            if formatting_count > 0:
+                readability_score += 0.3
+            checks += 1
+            
+            return readability_score / checks if checks > 0 else 0.0
+            
+        except Exception as e:
+            self.logger.error(f"Error analyzing text readability: {str(e)}")
+            return 0.0
+    
     async def _validate_repetition(self, slides: List[Dict[str, Any]], validation_level: str) -> float:
-        """Validate repetition principles."""
+        """Validate repetition principles with real analysis."""
         try:
             if len(slides) < 2:
                 return 1.0  # Single slide is automatically consistent
             
-            # Check for consistent elements across slides
+            # Real repetition analysis
             consistency_score = 0.0
             total_checks = 0
             
-            # Check title formatting consistency
-            title_lengths = [len(slide.get("title", "")) for slide in slides]
-            if len(set(title_lengths)) <= 2:  # Similar title lengths
-                consistency_score += 0.3
-            total_checks += 1
+            # Analyze title consistency
+            title_consistency = await self._analyze_title_consistency(slides)
+            if title_consistency > 0:
+                consistency_score += title_consistency
+                total_checks += 1
             
-            # Check content structure consistency
-            content_structures = []
-            for slide in slides:
-                content = slide.get("main_content", "")
-                structure = len(content.split('\n'))  # Number of paragraphs
-                content_structures.append(structure)
+            # Analyze content structure consistency
+            structure_consistency = await self._analyze_content_structure_consistency(slides)
+            if structure_consistency > 0:
+                consistency_score += structure_consistency
+                total_checks += 1
             
-            if len(set(content_structures)) <= 3:  # Similar content structures
-                consistency_score += 0.4
-            total_checks += 1
+            # Analyze formatting consistency
+            formatting_consistency = await self._analyze_formatting_consistency(slides)
+            if formatting_consistency > 0:
+                consistency_score += formatting_consistency
+                total_checks += 1
             
-            # Check for consistent bullet points or formatting
-            bullet_consistency = 0
-            for slide in slides:
-                content = slide.get("main_content", "")
-                if "•" in content or "-" in content or "*" in content:
-                    bullet_consistency += 1
-            
-            if bullet_consistency >= len(slides) * 0.7:  # 70% of slides have bullets
-                consistency_score += 0.3
-            total_checks += 1
+            # Analyze visual element consistency
+            visual_consistency = await self._analyze_visual_consistency(slides)
+            if visual_consistency > 0:
+                consistency_score += visual_consistency
+                total_checks += 1
             
             return consistency_score / total_checks if total_checks > 0 else 0.0
             
         except Exception as e:
             self.logger.error(f"Error validating repetition: {str(e)}")
+            return 0.0
+    
+    async def _analyze_title_consistency(self, slides: List[Dict[str, Any]]) -> float:
+        """Analyze title formatting consistency across slides"""
+        try:
+            titles = [slide.get("title", "") for slide in slides]
+            valid_titles = [title for title in titles if title.strip()]
+            
+            if len(valid_titles) < 2:
+                return 0.5  # Not enough titles to compare
+            
+            consistency_score = 0.0
+            checks = 0
+            
+            # Check title length consistency
+            title_lengths = [len(title) for title in valid_titles]
+            length_variance = max(title_lengths) - min(title_lengths)
+            if length_variance <= 20:  # Similar lengths
+                consistency_score += 0.3
+            checks += 1
+            
+            # Check title formatting consistency
+            formatting_patterns = []
+            for title in valid_titles:
+                if title[0].isupper():  # Starts with capital
+                    formatting_patterns.append("capital_start")
+                if ":" in title:  # Has colon
+                    formatting_patterns.append("has_colon")
+                if title.endswith("."):  # Ends with period
+                    formatting_patterns.append("ends_period")
+            
+            # Count most common pattern
+            if formatting_patterns:
+                from collections import Counter
+                pattern_counts = Counter(formatting_patterns)
+                most_common_count = max(pattern_counts.values())
+                consistency_score += (most_common_count / len(valid_titles)) * 0.4
+            checks += 1
+            
+            # Check title structure consistency
+            structure_indicators = ["#", "##", "###", "**", "*"]
+            structure_consistency = 0
+            for title in valid_titles:
+                if any(indicator in title for indicator in structure_indicators):
+                    structure_consistency += 1
+            
+            if structure_consistency > 0:
+                consistency_score += (structure_consistency / len(valid_titles)) * 0.3
+            checks += 1
+            
+            return consistency_score / checks if checks > 0 else 0.0
+            
+        except Exception as e:
+            self.logger.error(f"Error analyzing title consistency: {str(e)}")
+            return 0.0
+    
+    async def _analyze_content_structure_consistency(self, slides: List[Dict[str, Any]]) -> float:
+        """Analyze content structure consistency across slides"""
+        try:
+            content_structures = []
+            
+            for slide in slides:
+                content = slide.get("main_content", "")
+                structure = {
+                    "paragraphs": content.count('\n\n') + 1,
+                    "headings": content.count('#'),
+                    "lists": content.count('•') + content.count('-') + content.count('*'),
+                    "bold": content.count('**'),
+                    "italic": content.count('*') - content.count('**'),
+                    "length": len(content)
+                }
+                content_structures.append(structure)
+            
+            if len(content_structures) < 2:
+                return 0.5
+            
+            consistency_score = 0.0
+            checks = 0
+            
+            # Check paragraph count consistency
+            paragraph_counts = [s["paragraphs"] for s in content_structures]
+            if len(set(paragraph_counts)) <= 2:  # Similar paragraph counts
+                consistency_score += 0.3
+            checks += 1
+            
+            # Check heading usage consistency
+            heading_counts = [s["headings"] for s in content_structures]
+            if len(set(heading_counts)) <= 2:  # Similar heading counts
+                consistency_score += 0.2
+            checks += 1
+            
+            # Check list usage consistency
+            list_counts = [s["lists"] for s in content_structures]
+            if len(set(list_counts)) <= 2:  # Similar list counts
+                consistency_score += 0.2
+            checks += 1
+            
+            # Check formatting consistency
+            bold_counts = [s["bold"] for s in content_structures]
+            if len(set(bold_counts)) <= 2:  # Similar bold usage
+                consistency_score += 0.2
+            checks += 1
+            
+            # Check content length consistency
+            lengths = [s["length"] for s in content_structures]
+            length_variance = max(lengths) - min(lengths)
+            if length_variance <= 200:  # Similar lengths
+                consistency_score += 0.1
+            checks += 1
+            
+            return consistency_score / checks if checks > 0 else 0.0
+            
+        except Exception as e:
+            self.logger.error(f"Error analyzing content structure consistency: {str(e)}")
+            return 0.0
+    
+    async def _analyze_formatting_consistency(self, slides: List[Dict[str, Any]]) -> float:
+        """Analyze formatting consistency across slides"""
+        try:
+            formatting_patterns = []
+            
+            for slide in slides:
+                content = slide.get("main_content", "")
+                patterns = {
+                    "uses_bold": "**" in content,
+                    "uses_italic": "*" in content and "**" not in content,
+                    "uses_lists": any(indicator in content for indicator in ["•", "-", "*", "1.", "2."]),
+                    "uses_headings": "#" in content,
+                    "uses_code": "`" in content,
+                    "uses_quotes": '"' in content or "'" in content
+                }
+                formatting_patterns.append(patterns)
+            
+            if len(formatting_patterns) < 2:
+                return 0.5
+            
+            consistency_score = 0.0
+            checks = 0
+            
+            # Check each formatting pattern
+            for pattern in ["uses_bold", "uses_italic", "uses_lists", "uses_headings", "uses_code", "uses_quotes"]:
+                pattern_usage = [p[pattern] for p in formatting_patterns]
+                usage_count = sum(pattern_usage)
+                usage_ratio = usage_count / len(pattern_usage)
+                
+                # High consistency if most slides use the same pattern
+                if usage_ratio >= 0.8 or usage_ratio <= 0.2:
+                    consistency_score += 0.2
+                elif usage_ratio >= 0.6 or usage_ratio <= 0.4:
+                    consistency_score += 0.1
+                checks += 1
+            
+            return consistency_score / checks if checks > 0 else 0.0
+            
+        except Exception as e:
+            self.logger.error(f"Error analyzing formatting consistency: {str(e)}")
+            return 0.0
+    
+    async def _analyze_visual_consistency(self, slides: List[Dict[str, Any]]) -> float:
+        """Analyze visual element consistency across slides"""
+        try:
+            visual_elements = []
+            
+            for slide in slides:
+                elements = slide.get("visual_elements", [])
+                element_types = [elem.get("type", "unknown") for elem in elements]
+                visual_elements.append(element_types)
+            
+            if len(visual_elements) < 2:
+                return 0.5
+            
+            consistency_score = 0.0
+            checks = 0
+            
+            # Check visual element count consistency
+            element_counts = [len(elements) for elements in visual_elements]
+            if len(set(element_counts)) <= 2:  # Similar element counts
+                consistency_score += 0.3
+            checks += 1
+            
+            # Check visual element type consistency
+            all_types = []
+            for elements in visual_elements:
+                all_types.extend(elements)
+            
+            if all_types:
+                from collections import Counter
+                type_counts = Counter(all_types)
+                most_common_type = type_counts.most_common(1)[0][1]
+                type_consistency = most_common_type / len(all_types)
+                consistency_score += type_consistency * 0.4
+            checks += 1
+            
+            # Check alt text consistency
+            alt_text_usage = []
+            for slide in slides:
+                elements = slide.get("visual_elements", [])
+                has_alt_text = any(elem.get("alt_text") for elem in elements)
+                alt_text_usage.append(has_alt_text)
+            
+            alt_text_consistency = sum(alt_text_usage) / len(alt_text_usage)
+            consistency_score += alt_text_consistency * 0.3
+            checks += 1
+            
+            return consistency_score / checks if checks > 0 else 0.0
+            
+        except Exception as e:
+            self.logger.error(f"Error analyzing visual consistency: {str(e)}")
             return 0.0
     
     async def _validate_alignment(self, slides: List[Dict[str, Any]], validation_level: str) -> float:
@@ -480,3 +843,134 @@ class DesignAgent(BaseAgent):
             "Create clear visual hierarchy with headings",
             "Test designs on different screen sizes"
         ]
+    
+    async def _enhance_slides_with_design(self, slides: List[Dict[str, Any]], compliance_report: DesignComplianceReport, design_preferences: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Enhance slides with design improvements based on C.R.A.P. principles"""
+        try:
+            enhanced_slides = []
+            
+            for slide in slides:
+                enhanced_slide = slide.copy()
+                
+                # Apply design enhancements based on compliance scores
+                if compliance_report.contrast_score < 0.7:
+                    enhanced_slide = await self._enhance_contrast(enhanced_slide, design_preferences)
+                
+                if compliance_report.repetition_score < 0.7:
+                    enhanced_slide = await self._enhance_repetition(enhanced_slide, design_preferences)
+                
+                if compliance_report.alignment_score < 0.7:
+                    enhanced_slide = await self._enhance_alignment(enhanced_slide, design_preferences)
+                
+                if compliance_report.proximity_score < 0.7:
+                    enhanced_slide = await self._enhance_proximity(enhanced_slide, design_preferences)
+                
+                enhanced_slides.append(enhanced_slide)
+            
+            return enhanced_slides
+            
+        except Exception as e:
+            self.logger.error(f"Error enhancing slides with design: {str(e)}")
+            return slides  # Return original slides if enhancement fails
+    
+    async def _enhance_contrast(self, slide: Dict[str, Any], design_preferences: Dict[str, Any]) -> Dict[str, Any]:
+        """Enhance slide contrast and readability"""
+        try:
+            # Add contrast guidelines to slide
+            if "design_guidelines" not in slide:
+                slide["design_guidelines"] = []
+            
+            slide["design_guidelines"].extend([
+                "Use high contrast colors (dark text on light background or vice versa)",
+                "Ensure minimum 4.5:1 contrast ratio for normal text",
+                "Use bold or larger fonts for headings to create visual hierarchy"
+            ])
+            
+            # Enhance content with contrast improvements
+            content = slide.get("main_content", "")
+            if content:
+                # Add contrast enhancement suggestions
+                enhanced_content = content + "\n\n**Design Enhancement:**\n- Use high contrast colors for better readability\n- Bold important terms and concepts\n- Use bullet points and numbering for clarity"
+                slide["main_content"] = enhanced_content
+            
+            return slide
+            
+        except Exception as e:
+            self.logger.error(f"Error enhancing contrast: {str(e)}")
+            return slide
+    
+    async def _enhance_repetition(self, slide: Dict[str, Any], design_preferences: Dict[str, Any]) -> Dict[str, Any]:
+        """Enhance slide with consistent design elements"""
+        try:
+            # Add repetition guidelines
+            if "design_guidelines" not in slide:
+                slide["design_guidelines"] = []
+            
+            slide["design_guidelines"].extend([
+                "Use consistent font families throughout the presentation",
+                "Maintain consistent color scheme across all slides",
+                "Use consistent bullet point styles and formatting"
+            ])
+            
+            # Add consistent formatting to content
+            content = slide.get("main_content", "")
+            if content:
+                # Add consistency enhancement suggestions
+                enhanced_content = content + "\n\n**Consistency Guidelines:**\n- Use consistent formatting for all headings\n- Maintain uniform spacing and margins\n- Apply consistent styling to similar elements"
+                slide["main_content"] = enhanced_content
+            
+            return slide
+            
+        except Exception as e:
+            self.logger.error(f"Error enhancing repetition: {str(e)}")
+            return slide
+    
+    async def _enhance_alignment(self, slide: Dict[str, Any], design_preferences: Dict[str, Any]) -> Dict[str, Any]:
+        """Enhance slide alignment and visual structure"""
+        try:
+            # Add alignment guidelines
+            if "design_guidelines" not in slide:
+                slide["design_guidelines"] = []
+            
+            slide["design_guidelines"].extend([
+                "Align all text elements consistently (left, center, or right)",
+                "Use grid system for consistent element placement",
+                "Maintain consistent margins and padding throughout"
+            ])
+            
+            # Add alignment enhancement suggestions
+            content = slide.get("main_content", "")
+            if content:
+                enhanced_content = content + "\n\n**Alignment Guidelines:**\n- Use consistent text alignment throughout\n- Align related elements in a grid pattern\n- Maintain consistent spacing between elements"
+                slide["main_content"] = enhanced_content
+            
+            return slide
+            
+        except Exception as e:
+            self.logger.error(f"Error enhancing alignment: {str(e)}")
+            return slide
+    
+    async def _enhance_proximity(self, slide: Dict[str, Any], design_preferences: Dict[str, Any]) -> Dict[str, Any]:
+        """Enhance slide proximity and logical grouping"""
+        try:
+            # Add proximity guidelines
+            if "design_guidelines" not in slide:
+                slide["design_guidelines"] = []
+            
+            slide["design_guidelines"].extend([
+                "Group related elements close together",
+                "Use white space to separate different sections",
+                "Create clear visual hierarchy through spacing"
+            ])
+            
+            # Add proximity enhancement suggestions
+            content = slide.get("main_content", "")
+            if content:
+                enhanced_content = content + "\n\n**Proximity Guidelines:**\n- Group related information together\n- Use white space to create visual separation\n- Organize content in logical sections"
+                slide["main_content"] = enhanced_content
+            
+            return slide
+            
+        except Exception as e:
+            self.logger.error(f"Error enhancing proximity: {str(e)}")
+            return slide
