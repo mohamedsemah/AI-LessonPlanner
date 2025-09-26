@@ -1062,33 +1062,13 @@ class DesignAgent(BaseAgent):
                 
                 slide["main_content"] = '\n'.join(formatted_lines)
             
-            # Apply grouping to visual elements
+            # Apply grouping to visual elements (without creating invalid group types)
             if "visual_elements" in slide:
-                # Group related visual elements
-                grouped_elements = []
-                current_group = []
-                
+                # Add spacing properties to existing elements instead of grouping
                 for element in slide["visual_elements"]:
-                    if element.get("type") == "image":
-                        if current_group:
-                            grouped_elements.append({
-                                "type": "group",
-                                "elements": current_group,
-                                "spacing": 10
-                            })
-                            current_group = []
-                        grouped_elements.append(element)
-                    else:
-                        current_group.append(element)
-                
-                if current_group:
-                    grouped_elements.append({
-                        "type": "group", 
-                        "elements": current_group,
-                        "spacing": 10
-                    })
-                
-                slide["visual_elements"] = grouped_elements
+                    element["margin_bottom"] = 15
+                    element["margin_top"] = 10
+                    element["grouped"] = True
             
             # Set consistent spacing properties
             slide["margin_between_sections"] = 25

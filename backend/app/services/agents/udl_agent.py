@@ -478,12 +478,11 @@ class UDLAgent(BaseAgent):
             if not has_diagram:
                 visual_elements.append({
                     "type": "diagram",
-                    "title": f"Conceptual diagram for {slide.get('title', 'topic')}",
+                    "url": f"placeholder_diagram_{slide.get('title', 'topic').replace(' ', '_').lower()}.png",
                     "description": "Visual representation of key concepts",
                     "alt_text": f"Diagram showing {slide.get('title', 'main concepts')}",
                     "position": "right",
-                    "size": "medium",
-                    "interactive": True
+                    "size": "medium"
                 })
             
             # Add chart/graph if not present
@@ -491,12 +490,11 @@ class UDLAgent(BaseAgent):
             if not has_chart:
                 visual_elements.append({
                     "type": "chart",
-                    "title": f"Data visualization for {slide.get('title', 'topic')}",
+                    "url": f"placeholder_chart_{slide.get('title', 'topic').replace(' ', '_').lower()}.png",
                     "description": "Chart showing relevant data and relationships",
                     "alt_text": f"Chart displaying data related to {slide.get('title', 'the topic')}",
                     "position": "left",
-                    "size": "medium",
-                    "interactive": True
+                    "size": "medium"
                 })
             
             slide["visual_elements"] = visual_elements
@@ -555,29 +553,14 @@ class UDLAgent(BaseAgent):
             slide["collaborative_learning"] = True
             slide["self_assessment"] = True
             
-            # Add diverse interactive activities
-            slide["activities"] = {
-                "discussion": {
-                    "type": "group_discussion",
-                    "prompt": f"Discuss real-world applications of {slide.get('title', 'this concept')}",
-                    "duration": 5,
-                    "group_size": 4,
-                    "scaffolding": True
-                },
-                "practice": {
-                    "type": "hands_on_exercise",
-                    "description": f"Practice implementing {slide.get('title', 'the concept')}",
-                    "difficulty": "beginner",
-                    "time_limit": 10,
-                    "hints_available": True
-                },
-                "reflection": {
-                    "type": "individual_reflection",
-                    "prompt": "How does this concept relate to your previous knowledge?",
-                    "format": "written_or_verbal",
-                    "sharing_optional": True
-                }
-            }
+            # Add diverse interactive activities as a simple list
+            slide["activities"] = [
+                f"Group discussion: Real-world applications of {slide.get('title', 'this concept')}",
+                f"Hands-on practice: Implement {slide.get('title', 'the concept')}",
+                "Individual reflection: How does this relate to your previous knowledge?",
+                "Peer teaching: Explain the concept to a classmate",
+                "Visual demonstration: Create a diagram or flowchart"
+            ]
             
             # Add multiple assessment options
             slide["assessment_options"] = {
